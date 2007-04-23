@@ -68,7 +68,7 @@ protected:
     dods_int16 _buf;
 
 public:
-    Int16(const string &n = "");
+    Int16(const string &n = "", const string &ds = "");
     virtual ~Int16() {}
 
     Int16(const Int16 &copy_from);

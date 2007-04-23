@@ -56,7 +56,8 @@ TestFloat32::_duplicate(const TestFloat32 &ts)
     d_series_values = ts.d_series_values;
 }
 
-TestFloat32::TestFloat32(const string &n) : Float32(n), d_series_values(false)
+TestFloat32::TestFloat32(const string &n, const string &ds)
+    : Float32(n, ds), d_series_values(false)
 {
     _buf = 0.0;
 }

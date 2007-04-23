@@ -56,8 +56,9 @@ TestSequence::ptr_duplicate()
     return new TestSequence(*this);
 }
 
-TestSequence::TestSequence(const string &n) : Sequence(n), d_len(4),
-	d_current(0), d_series_values(false)
+TestSequence::TestSequence(const string &n, const string &ds)
+    : Sequence(n, ds), d_len(4),
+      d_current(0), d_series_values(false)
 {
 }
 

@@ -71,7 +71,7 @@ protected:
     dods_float32 _buf;
 
 public:
-    Float32(const string &n = "");
+    Float32(const string &n = "", const string &ds = "");
 
     Float32(const Float32 &copy_from);
 

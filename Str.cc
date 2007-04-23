@@ -62,7 +62,8 @@ using std::endl;
     created. 
 
 */
-Str::Str(const string &n) : BaseType(n, dods_str_c), _buf("")
+Str::Str(const string &n, const string &ds)
+    : BaseType(n, dods_str_c, NULL, ds), _buf("")
 {
 }
 

@@ -61,8 +61,8 @@ using std::endl;
     @param n A string containing the name of the variable to be
     created. 
 */
-Int32::Int32(const string &n) 
-    : BaseType(n, dods_int32_c, (xdrproc_t)XDR_INT32)
+Int32::Int32(const string &n, const string &ds) 
+    : BaseType(n, dods_int32_c, (xdrproc_t)XDR_INT32, ds)
 {
 }
 

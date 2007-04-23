@@ -57,7 +57,8 @@ TestInt32::_duplicate(const TestInt32 &ts)
     d_series_values = ts.d_series_values;
 }
 
-TestInt32::TestInt32(const string &n) : Int32(n), d_series_values(false)
+TestInt32::TestInt32(const string &n, const string &ds)
+    : Int32(n, ds), d_series_values(false)
 {
     _buf = 1;
 }

@@ -48,7 +48,7 @@ private:
     void _duplicate(const TestSequence &ts);
 
 public:
-    TestSequence(const string &n = "");
+    TestSequence(const string &n = "", const string &ds = "");
     TestSequence(const TestSequence &rhs);
 
     virtual ~TestSequence();

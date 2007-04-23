@@ -58,8 +58,8 @@ Constructor::_duplicate(const Constructor &)
 
 // Public member functions
 
-Constructor::Constructor(const string &n, const Type &t) 
-    : BaseType(n, t)
+Constructor::Constructor(const string &n, const Type &t, const string &ds) 
+    : BaseType(n, t, NULL, ds)
 {
 }
 

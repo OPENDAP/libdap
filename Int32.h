@@ -71,7 +71,7 @@ protected:
     dods_int32 _buf;
 
 public:
-  Int32(const string &n = "");
+  Int32(const string &n = "", const string &ds = "");
 
   Int32(const Int32 &copy_from);
 

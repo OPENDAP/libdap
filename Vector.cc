@@ -111,8 +111,8 @@ void Vector::_duplicate(const Vector & v)
 
     @see Type
     @brief The Vector constructor.  */
-Vector::Vector(const string & n, BaseType * v, const Type & t)
-:BaseType(n, t), _length(-1), _var(0), _buf(0), _vec(0)
+Vector::Vector(const string & n, BaseType * v, const Type & t, const string &ds)
+  : BaseType(n, t, NULL, ds), _length(-1), _var(0), _buf(0), _vec(0)
 {
     if (v)
         add_var(v);

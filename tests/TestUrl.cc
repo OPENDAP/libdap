@@ -56,7 +56,8 @@ TestUrl::_duplicate(const TestUrl &ts)
     d_series_values = ts.d_series_values;
 }
 
-TestUrl::TestUrl(const string &n) : Url(n), d_series_values(false)
+TestUrl::TestUrl(const string &n, const string &ds)
+    : Url(n, ds), d_series_values(false)
 {
 }
 

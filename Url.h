@@ -66,7 +66,7 @@ private:
     friend class Str;
 
 public:
-  Url(const string &n = "");
+  Url(const string &n = "", const string &ds = "");
   virtual ~Url() {}
 
     virtual BaseType *ptr_duplicate();

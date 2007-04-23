@@ -61,8 +61,8 @@ using std::endl;
     created. 
 
 */
-Float32::Float32(const string &n) 
-    : BaseType(n, dods_float32_c, (xdrproc_t)XDR_FLOAT32)
+Float32::Float32(const string &n, const string &ds) 
+    : BaseType(n, dods_float32_c, (xdrproc_t)XDR_FLOAT32, ds)
 {
 }
 

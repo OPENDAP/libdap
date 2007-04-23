@@ -48,7 +48,7 @@ class TestStr: public Str, public TestCommon {
     void _duplicate(const TestStr &ts);
 
 public:
-    TestStr(const string &n = "");
+    TestStr(const string &n = "", const string &ds = "");
     TestStr(const TestStr &rhs);
 
     virtual ~TestStr() {}

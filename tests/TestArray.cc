@@ -69,8 +69,9 @@ TestArray::ptr_duplicate()
     return new TestArray(*this);
 }
 
-TestArray::TestArray(const string &n, BaseType *v) : Array(n, v),
-        d_series_values(false)
+TestArray::TestArray(const string &n, BaseType *v, const string &ds)
+    : Array(n, v, ds),
+      d_series_values(false)
 {
 }
 

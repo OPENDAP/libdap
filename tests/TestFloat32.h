@@ -46,7 +46,7 @@ class TestFloat32: public Float32, public TestCommon {
     void _duplicate(const TestFloat32 &ts);
 
 public:
-    TestFloat32(const string &n = (char *)0);
+    TestFloat32(const string &n = (char *)0, const string &ds = "");
     TestFloat32(const TestFloat32 &rhs);
 
     virtual ~TestFloat32() {}

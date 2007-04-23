@@ -69,7 +69,8 @@ TestGrid::operator=(const TestGrid &rhs)
 }
 
 
-TestGrid::TestGrid(const string &n) : Grid(n), d_series_values(false)
+TestGrid::TestGrid(const string &n, const string &ds)
+    : Grid(n, ds), d_series_values(false)
 {
 }
 

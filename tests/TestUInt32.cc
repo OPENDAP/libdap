@@ -55,7 +55,8 @@ TestUInt32::_duplicate(const TestUInt32 &ts)
 }
 
 
-TestUInt32::TestUInt32(const string &n) : UInt32(n), d_series_values(false)
+TestUInt32::TestUInt32(const string &n, const string &ds)
+    : UInt32(n, ds), d_series_values(false)
 {
     _buf = 1;
 }

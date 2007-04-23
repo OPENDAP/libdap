@@ -45,7 +45,7 @@ class TestGrid: public Grid, public TestCommon {
     void _duplicate(const TestGrid &ts);
 
 public:
-    TestGrid(const string &n = "");
+    TestGrid(const string &n = "", const string &ds = "");
     TestGrid(const TestGrid &rhs);
 
     virtual ~TestGrid();

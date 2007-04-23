@@ -40,7 +40,7 @@ Regex::init(const char *t)
     d_preg = new regex_t;
     int result = regcomp(d_preg, t, REG_EXTENDED);
 
-    if  (result != 0) {
+    if  (result != REG_NOERROR) {
         size_t msg_len = regerror(result, d_preg, (char *)NULL, (size_t)0);
         char *msg = new char[msg_len+1];
         regerror(result, d_preg, msg, msg_len);
@@ -85,6 +85,7 @@ Regex::match(const char*s, int len, int pos)
     string ss = s;
     
     int result = regexec(d_preg, ss.substr(pos, len).c_str(), 1, pmatch, 0);
+
     if (result == REG_NOMATCH)
         return -1;
 

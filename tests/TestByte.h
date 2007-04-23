@@ -55,7 +55,7 @@ class TestByte: public Byte, public TestCommon {
     void _duplicate(const TestByte &ts);
 
 public:
-    TestByte(const string &n = "");
+    TestByte(const string &n = "", const string &ds = "");
     TestByte(const TestByte &rhs);
 
     virtual ~TestByte() {}

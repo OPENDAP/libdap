@@ -74,7 +74,8 @@ Grid::_duplicate(const Grid &s)
 
     @brief The Grid constructor.
 */
-Grid::Grid(const string &n) : Constructor(n, dods_grid_c), _array_var(0)
+Grid::Grid(const string &n, const string &ds)
+    : Constructor(n, dods_grid_c, ds), _array_var(0)
 {
 }
 

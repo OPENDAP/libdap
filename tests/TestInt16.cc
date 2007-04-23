@@ -54,7 +54,8 @@ TestInt16::_duplicate(const TestInt16 &ts)
     d_series_values = ts.d_series_values;
 }
 
-TestInt16::TestInt16(const string &n) : Int16(n), d_series_values(false)
+TestInt16::TestInt16(const string &n, const string &ds)
+    : Int16(n, ds), d_series_values(false)
 {
     _buf = 1;
 }

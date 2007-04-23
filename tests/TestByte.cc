@@ -79,7 +79,8 @@ TestByte::_duplicate(const TestByte &ts)
     d_series_values = ts.d_series_values;
 }
 
-TestByte::TestByte(const string &n) : Byte(n), d_series_values(false)
+TestByte::TestByte(const string &n, const string &ds)
+    : Byte(n, ds), d_series_values(false)
 {
     _buf = 255;
 }

@@ -45,7 +45,7 @@ class TestFloat64: public Float64, public TestCommon {
     void _duplicate(const TestFloat64 &ts);
 
 public:
-    TestFloat64(const string &n = "");
+    TestFloat64(const string &n = "", const string &ds = "");
     TestFloat64(const TestFloat64 &rhs);
 
     virtual ~TestFloat64() {}

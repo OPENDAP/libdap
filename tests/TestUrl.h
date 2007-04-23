@@ -45,7 +45,7 @@ class TestUrl: public Url, public TestCommon {
     void _duplicate(const TestUrl &ts);
 
 public:
-    TestUrl(const string &n = "");
+    TestUrl(const string &n = "", const string &ds = "");
     TestUrl(const TestUrl &rhs);
 
     virtual ~TestUrl() {}

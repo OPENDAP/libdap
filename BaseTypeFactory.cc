@@ -44,81 +44,81 @@
 #include "debug.h"
 
 Byte *
-BaseTypeFactory::NewByte(const string &n ) const 
+BaseTypeFactory::NewByte(const string &n, const string &ds ) const 
 { 
-    return new Byte(n);
+    return new Byte(n, ds);
 }
 
 Int16 *
-BaseTypeFactory::NewInt16(const string &n ) const 
+BaseTypeFactory::NewInt16(const string &n, const string &ds ) const 
 { 
-    return new Int16(n); 
+    return new Int16(n, ds); 
 }
 
 UInt16 *
-BaseTypeFactory::NewUInt16(const string &n ) const 
+BaseTypeFactory::NewUInt16(const string &n, const string &ds ) const 
 { 
-    return new UInt16(n);
+    return new UInt16(n, ds);
 }
 
 Int32 *
-BaseTypeFactory::NewInt32(const string &n ) const 
+BaseTypeFactory::NewInt32(const string &n, const string &ds ) const 
 { 
     DBG(cerr << "Inside BaseTypeFactory::NewInt32" << endl);
-    return new Int32(n);
+    return new Int32(n, ds);
 }
 
 UInt32 *
-BaseTypeFactory::NewUInt32(const string &n ) const 
+BaseTypeFactory::NewUInt32(const string &n, const string &ds ) const 
 { 
-    return new UInt32(n);
+    return new UInt32(n, ds);
 }
 
 Float32 *
-BaseTypeFactory::NewFloat32(const string &n ) const 
+BaseTypeFactory::NewFloat32(const string &n, const string &ds ) const 
 { 
-    return new Float32(n);
+    return new Float32(n, ds);
 }
 
 Float64 *
-BaseTypeFactory::NewFloat64(const string &n ) const 
+BaseTypeFactory::NewFloat64(const string &n, const string &ds ) const 
 { 
-    return new Float64(n);
+    return new Float64(n, ds);
 }
 
 Str *
-BaseTypeFactory::NewStr(const string &n ) const 
+BaseTypeFactory::NewStr(const string &n, const string &ds ) const 
 { 
-    return new Str(n);
+    return new Str(n, ds);
 }
 
 Url *
-BaseTypeFactory::NewUrl(const string &n ) const 
+BaseTypeFactory::NewUrl(const string &n, const string &ds ) const 
 { 
-    return new Url(n);
+    return new Url(n, ds);
 }
 
 Array *
-BaseTypeFactory::NewArray(const string &n , BaseType *v) const 
+BaseTypeFactory::NewArray(const string &n, BaseType *v, const string &ds) const
 { 
-    return new Array(n, v);
+    return new Array(n, v, ds);
 }
 
 Structure *
-BaseTypeFactory::NewStructure(const string &n ) const 
+BaseTypeFactory::NewStructure(const string &n, const string &ds ) const 
 { 
-    return new Structure(n);
+    return new Structure(n, ds);
 }
 
 Sequence *
-BaseTypeFactory::NewSequence(const string &n ) const 
+BaseTypeFactory::NewSequence(const string &n, const string &ds ) const 
 { 
     DBG(cerr << "Inside BaseTypeFactory::NewSequence" << endl);
-    return new Sequence(n);
+    return new Sequence(n, ds);
 }
 
 Grid *
-BaseTypeFactory::NewGrid(const string &n ) const 
+BaseTypeFactory::NewGrid(const string &n, const string &ds ) const 
 { 
-    return new Grid(n);
+    return new Grid(n, ds);
 }

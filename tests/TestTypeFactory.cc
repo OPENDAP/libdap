@@ -46,81 +46,82 @@
 #include "debug.h"
 
 Byte *
-TestTypeFactory::NewByte(const string &n ) const 
+TestTypeFactory::NewByte(const string &n, const string &ds ) const 
 { 
-    return new TestByte(n);
+    return new TestByte(n, ds);
 }
 
 Int16 *
-TestTypeFactory::NewInt16(const string &n ) const 
+TestTypeFactory::NewInt16(const string &n, const string &ds ) const 
 { 
-    return new TestInt16(n); 
+    return new TestInt16(n, ds); 
 }
 
 UInt16 *
-TestTypeFactory::NewUInt16(const string &n ) const 
+TestTypeFactory::NewUInt16(const string &n, const string &ds ) const 
 { 
-    return new TestUInt16(n);
+    return new TestUInt16(n, ds);
 }
 
 Int32 *
-TestTypeFactory::NewInt32(const string &n ) const 
+TestTypeFactory::NewInt32(const string &n, const string &ds ) const 
 { 
     DBG(cerr << "Inside TestTypeFactory::NewInt32" << endl);
-    return new TestInt32(n);
+    return new TestInt32(n, ds);
 }
 
 UInt32 *
-TestTypeFactory::NewUInt32(const string &n ) const 
+TestTypeFactory::NewUInt32(const string &n, const string &ds ) const 
 { 
-    return new TestUInt32(n);
+    return new TestUInt32(n, ds);
 }
 
 Float32 *
-TestTypeFactory::NewFloat32(const string &n ) const 
+TestTypeFactory::NewFloat32(const string &n, const string &ds ) const 
 { 
-    return new TestFloat32(n);
+    return new TestFloat32(n, ds);
 }
 
 Float64 *
-TestTypeFactory::NewFloat64(const string &n ) const 
+TestTypeFactory::NewFloat64(const string &n, const string &ds ) const 
 { 
-    return new TestFloat64(n);
+    return new TestFloat64(n, ds);
 }
 
 Str *
-TestTypeFactory::NewStr(const string &n ) const 
+TestTypeFactory::NewStr(const string &n, const string &ds ) const 
 { 
-    return new TestStr(n);
+    return new TestStr(n, ds);
 }
 
 Url *
-TestTypeFactory::NewUrl(const string &n ) const 
+TestTypeFactory::NewUrl(const string &n, const string &ds ) const 
 { 
-    return new TestUrl(n);
+    return new TestUrl(n, ds);
 }
 
 Array *
-TestTypeFactory::NewArray(const string &n , BaseType *v) const 
+TestTypeFactory::NewArray(const string &n , BaseType *v, const string &ds) const
 { 
-    return new TestArray(n, v);
+    return new TestArray(n, v, ds);
 }
 
 Structure *
-TestTypeFactory::NewStructure(const string &n ) const 
+TestTypeFactory::NewStructure(const string &n, const string &ds ) const 
 { 
-    return new TestStructure(n);
+    return new TestStructure(n, ds);
 }
 
 Sequence *
-TestTypeFactory::NewSequence(const string &n ) const 
+TestTypeFactory::NewSequence(const string &n, const string &ds ) const 
 {
     DBG(cerr << "Inside TestTypeFactory::NewSequence" << endl);
-    return new TestSequence(n);
+    return new TestSequence(n, ds);
 }
 
 Grid *
-TestTypeFactory::NewGrid(const string &n ) const 
+TestTypeFactory::NewGrid(const string &n, const string &ds ) const 
 { 
-    return new TestGrid(n);
+    return new TestGrid(n, ds);
 }
+

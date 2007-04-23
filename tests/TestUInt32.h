@@ -45,7 +45,7 @@ class TestUInt32: public UInt32, public TestCommon {
     void _duplicate(const TestUInt32 &ts);
 
 public:
-    TestUInt32(const string &n = "");
+    TestUInt32(const string &n = "", const string &ds = "");
     TestUInt32(const TestUInt32 &rhs);
 
     virtual ~TestUInt32() {}

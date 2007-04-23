@@ -45,7 +45,7 @@ class TestUInt16: public UInt16, public TestCommon {
     void _duplicate(const TestUInt16 &ts);
 
 public:
-    TestUInt16(const string &n = "");
+    TestUInt16(const string &n = "", const string &ds = "");
     TestUInt16(const TestUInt16 &rhs);
 
     virtual ~TestUInt16() {}

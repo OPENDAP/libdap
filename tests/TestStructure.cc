@@ -66,8 +66,8 @@ TestStructure::operator=(const TestStructure &rhs)
     return *this;
 }
 
-TestStructure::TestStructure(const string &n) : Structure(n),
-        d_series_values(false)
+TestStructure::TestStructure(const string &n, const string &ds)
+    : Structure(n, ds), d_series_values(false)
 {
 }
 

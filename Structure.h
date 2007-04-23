@@ -104,7 +104,7 @@ protected:
     void _duplicate(const Structure &s);
 
 public:
-    Structure(const string &n = "");
+    Structure(const string &n = "", const string &ds = "");
 
     Structure(const Structure &rhs);
     virtual ~Structure();

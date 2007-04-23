@@ -52,7 +52,7 @@ public:
     typedef std::vector<BaseType *>::iterator Vars_iter ;
     typedef std::vector<BaseType *>::reverse_iterator Vars_riter ;
 
-    Constructor(const string &n, const Type &t);
+    Constructor(const string &n, const Type &t, const string &ds);
 
     Constructor(const Constructor &copy_from);
     virtual ~Constructor();

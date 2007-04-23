@@ -143,11 +143,12 @@ is_end_of_sequence(unsigned char marker)
     created. 
 
     @brief The Sequence constructor. */
-Sequence::Sequence(const string &n) : Constructor(n, dods_sequence_c), 
-        d_row_number(-1), d_starting_row_number(-1),
-        d_row_stride(1), d_ending_row_number(-1),
-	d_unsent_data(false), d_wrote_soi(false),
-        d_leaf_sequence(false), d_top_most(false)
+Sequence::Sequence(const string &n, const string &ds)
+    : Constructor(n, dods_sequence_c, ds), 
+      d_row_number(-1), d_starting_row_number(-1),
+      d_row_stride(1), d_ending_row_number(-1),
+      d_unsent_data(false), d_wrote_soi(false),
+      d_leaf_sequence(false), d_top_most(false)
 {
 }
 

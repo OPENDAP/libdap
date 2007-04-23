@@ -97,7 +97,8 @@ protected:
     void _duplicate(const Vector &v);
 
 public:
-    Vector(const string &n = "", BaseType *v = 0, const Type &t = dods_null_c);
+    Vector(const string &n = "", BaseType *v = 0,
+	   const Type &t = dods_null_c, const string &ds = "");
     Vector(const Vector &rhs);
 
     virtual ~Vector();

@@ -82,7 +82,8 @@ Structure::_duplicate(const Structure &s)
     @param n A string containing the name of the variable to be
     created. 
 */
-Structure::Structure(const string &n) :Constructor(n, dods_structure_c)
+Structure::Structure(const string &n, const string &ds)
+    : Constructor(n, dods_structure_c, ds)
 {
 }
 

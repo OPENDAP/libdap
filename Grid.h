@@ -124,7 +124,7 @@ private:
 
 public:
 
-    Grid(const string &n = "");
+    Grid(const string &n = "", const string &ds = "");
     Grid(const Grid &rhs);
     virtual ~Grid();
 

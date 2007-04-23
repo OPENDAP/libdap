@@ -58,8 +58,8 @@ static char rcsid[] not_used = {"$Id$"};
 using std::cerr;
 using std::endl;
 
-UInt16::UInt16(const string &n) 
-    : BaseType(n, dods_uint16_c, (xdrproc_t)XDR_UINT16)
+UInt16::UInt16(const string &n, const string &ds) 
+    : BaseType(n, dods_uint16_c, (xdrproc_t)XDR_UINT16, ds)
 {
 }
 

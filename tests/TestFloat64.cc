@@ -56,7 +56,8 @@ TestFloat64::_duplicate(const TestFloat64 &ts)
     d_series_values = ts.d_series_values;
 }
 
-TestFloat64::TestFloat64(const string &n) : Float64(n), d_series_values(false)
+TestFloat64::TestFloat64(const string &n, const string &ds)
+    : Float64(n, ds), d_series_values(false)
 {
     _buf = 0.0;
 }

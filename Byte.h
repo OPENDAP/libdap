@@ -72,7 +72,7 @@ protected:
     dods_byte _buf;
 
 public:
-  Byte(const string &n = "");
+  Byte(const string &n = "", const string &ds = "");
 
   virtual ~Byte() {}
   

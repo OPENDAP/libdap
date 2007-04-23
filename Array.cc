@@ -100,7 +100,8 @@ Array::update_length(int)
     in the Array. 
     @brief Array constructor
 */
-Array::Array(const string &n, BaseType *v) : Vector(n, 0, dods_array_c)
+Array::Array(const string &n, BaseType *v, const string &ds)
+    : Vector(n, 0, dods_array_c, ds)
 {
     add_var(v);
 }

@@ -44,7 +44,7 @@
 
 */
 
-Url::Url(const string &n) : Str(n)
+Url::Url(const string &n, const string &ds) : Str(n, ds)
 {
     set_type(dods_url_c);		// override the type set by Str
 }

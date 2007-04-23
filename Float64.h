@@ -71,7 +71,7 @@ protected:
     dods_float64 _buf;
 
 public:
-    Float64(const string &n = "");
+    Float64(const string &n = "", const string &ds = "");
     virtual ~Float64() {}
 
     Float64(const Float64 &copy_from);

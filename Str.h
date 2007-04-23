@@ -74,7 +74,7 @@ protected:
     string _buf;
 
 public:
-    Str(const string &n = "");
+    Str(const string &n = "", const string &ds = "");
 
     virtual ~Str() {}
 

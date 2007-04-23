@@ -58,7 +58,8 @@ TestStr::_duplicate(const TestStr &ts)
 }
 
 
-TestStr::TestStr(const string &n) : Str(n), d_series_values(false)
+TestStr::TestStr(const string &n, const string &ds)
+    : Str(n, ds), d_series_values(false)
 {
 }
 

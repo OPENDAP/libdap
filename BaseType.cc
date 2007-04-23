@@ -65,6 +65,7 @@ void
 BaseType::_duplicate(const BaseType &bt)
 {
     _name = bt._name;
+    _dataset = bt._dataset;
     _type = bt._type;
     _read_p = bt._read_p;	// added, reza
     _send_p = bt._send_p;	// added, reza
@@ -99,9 +100,10 @@ BaseType::_duplicate(const BaseType &bt)
     @param xdr A pointer to an XDR filter to use to transmit the
     data in this variable to a client DODS process.
     @see Type */
-BaseType::BaseType(const string &n, const Type &t, xdrproc_t xdr)
-    : _name(n), _type(t), _xdr_coder(xdr), _read_p(false), _send_p(false),
-      d_in_selection(false), _synthesized_p(false), d_parent(0)
+BaseType::BaseType(const string &n, const Type &t,
+		   xdrproc_t xdr, const string &ds)
+    : _name(n), _dataset(ds), _type(t), _xdr_coder(xdr), _read_p(false),
+      _send_p(false), d_in_selection(false), _synthesized_p(false), d_parent(0)
 {
 } 
 
@@ -138,6 +140,7 @@ BaseType::toString()
     ostringstream oss;
     oss << "BaseType (" << this << "):" << endl
 	<< "          _name: " << _name << endl
+	<< "          _dataset: " << _dataset << endl
 	<< "          _type: " << type_name() << endl
 	<< "          _read_p: " << _read_p << endl
 	<< "          _send_p: " << _send_p << endl
@@ -164,6 +167,7 @@ BaseType::dump( ostream &strm ) const
     DapIndent::Indent() ;
 
     strm << DapIndent::LMarg << "name: " << _name << endl ;
+    strm << DapIndent::LMarg << "dataset: " << _dataset << endl ;
     strm << DapIndent::LMarg << "type: " << type_name() << endl ;
     strm << DapIndent::LMarg << "read_p: " << _read_p << endl ;
     strm << DapIndent::LMarg << "send_p: " << _send_p << endl ;
@@ -191,6 +195,22 @@ BaseType::set_name(const string &n)
 { 
     string name = n;
     _name = www2id(name);	// www2id writes into its param.
+}
+
+/** @brief Returns the dataset of the class instance. 
+ */
+string 
+BaseType::dataset() const
+{
+    return _dataset; 
+}
+
+/** @brief Sets the dataset of the class instance. */
+void 
+BaseType::set_dataset(const string &d)
+{ 
+    string dataset = d;
+    _dataset = www2id(dataset);	// www2id writes into its param.
 }
 
 /** @brief Returns the type of the class instance. */

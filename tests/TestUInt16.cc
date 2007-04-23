@@ -55,7 +55,8 @@ TestUInt16::_duplicate(const TestUInt16 &ts)
 }
 
 
-TestUInt16::TestUInt16(const string &n) : UInt16(n), d_series_values(false)
+TestUInt16::TestUInt16(const string &n, const string &ds)
+    : UInt16(n, ds), d_series_values(false)
 {
     _buf = 1;
 }

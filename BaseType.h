@@ -196,6 +196,8 @@ enum Type {
 class BaseType : public DapObj {
 private:
     string _name;		// name of the instance
+    string _dataset;		// name of the dataset from which this
+				// variable created
     Type _type;			// instance's type
 
     // xdr_coder is used as an argument to xdr procedures that encode groups
@@ -221,7 +223,7 @@ protected:
 
 public:
     BaseType(const string &n = "", const Type &t = dods_null_c,
-	     xdrproc_t xdr = NULL);
+	     xdrproc_t xdr = NULL, const string &ds = "");
 
     BaseType(const BaseType &copy_from);
     virtual ~BaseType();
@@ -241,6 +243,9 @@ public:
 
     string name() const;
     virtual void set_name(const string &n);
+
+    string dataset() const;
+    virtual void set_dataset(const string &d);
 
     Type type() const;
     void set_type(const Type &t);

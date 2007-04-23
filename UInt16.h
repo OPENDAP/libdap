@@ -68,7 +68,7 @@ protected:
     dods_uint16 _buf;
 
 public:
-    UInt16(const string &n = "");
+    UInt16(const string &n = "", const string &ds = "");
     virtual ~UInt16() {}
 
     UInt16(const UInt16 &copy_from);

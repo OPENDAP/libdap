@@ -44,7 +44,7 @@ class TestStructure: public Structure, public TestCommon {
     void _duplicate(const TestStructure &ts);
 
 public:
-    TestStructure(const string &n = "");
+    TestStructure(const string &n = "", const string &ds = "");
     TestStructure(const TestStructure &rhs);
 
     virtual ~TestStructure();

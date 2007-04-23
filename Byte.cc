@@ -68,7 +68,8 @@ using std::endl;
 
 */
 
-Byte::Byte(const string &n) : BaseType(n, dods_byte_c)
+Byte::Byte(const string &n, const string &ds)
+    : BaseType(n, dods_byte_c, NULL, ds)
 {
 }
 

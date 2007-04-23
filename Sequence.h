@@ -235,7 +235,7 @@ protected:
 
 public:
 
-    Sequence(const string &n = "");
+    Sequence(const string &n = "", const string &ds = "");
 
     Sequence(const Sequence &rhs);
 

@@ -45,7 +45,7 @@ class TestArray: public Array, public TestCommon {
     int m_offset(int y, Dim_iter Y, int x);
 
 public:
-    TestArray(const string &n = "", BaseType *v = 0);
+    TestArray(const string &n = "", BaseType *v = 0, const string &ds = "");
     TestArray(const TestArray &rhs);
 
     virtual ~TestArray();
