@@ -26,7 +26,12 @@
 #ifndef _http_cache_table_h
 #define _http_cache_table_h
 
-#define DODS_DEBUG
+//#define DODS_DEBUG
+
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include <pthread.h>
 
@@ -37,6 +42,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <algorithm>
 
 #ifndef _error_h
 #include "Error.h"
@@ -56,13 +62,30 @@
 #define INIT(m) pthread_mutex_init((m), 0)
 #define DESTROY(m) pthread_mutex_destroy((m))
 
+// Defined in the apue_db library which we include
+extern "C" int lock_reg(int, int, int, off_t, int, off_t);
+#define	read_lock(fd, offset, whence, len) \
+			lock_reg((fd), F_SETLK, F_RDLCK, (offset), (whence), (len))
+#define	readw_lock(fd, offset, whence, len) \
+			lock_reg((fd), F_SETLKW, F_RDLCK, (offset), (whence), (len))
+#define	write_lock(fd, offset, whence, len) \
+			lock_reg((fd), F_SETLK, F_WRLCK, (offset), (whence), (len))
+#define	writew_lock(fd, offset, whence, len) \
+			lock_reg((fd), F_SETLKW, F_WRLCK, (offset), (whence), (len))
+#define	un_lock(fd, offset, whence, len) \
+			lock_reg((fd), F_SETLK, F_UNLCK, (offset), (whence), (len))
+
+typedef	void *	DBHANDLE; 	// defined in apue_db but don't include that in 
+							// a public header.
+
 using namespace std;
 
 namespace libdap
 {
 
+#if 0
 int get_hash(const string &url);
-
+#endif
 /** The table of entires in the client-side cache.
     @todo This class needed to have the locking mechanism in place to work 
     or it must become a singleton. */
@@ -83,8 +106,10 @@ public:
 	{
 	private:
 		string url;  // Location
-	    int hash;
-	    int hits;  // Hit counts
+#if 0
+		int hash;
+#endif
+		int hits;  // Hit counts
 	    string cachename;
 
 	    string etag;
@@ -105,13 +130,15 @@ public:
 	    bool no_cache;  // This field is not saved in the index.
 
 	    int readers;
+	    int writer;
+#if 0
 	    pthread_mutex_t d_response_lock;	// set if being read
 	    pthread_mutex_t d_response_write_lock;			// set if being written
 	    
 	    // This lock prevents access to the fields of a CacheEntry. Might not
 	    // be needed.
 	    pthread_mutex_t d_lock;
-	    
+#endif	    
 	    // Allow HTTPCacheTable methods access and the test class, too
 	    friend class HTTPCacheTable;
 		friend class HTTPCacheTest;
@@ -119,6 +146,7 @@ public:
 		// Allow access by the fucntors used in HTTPCacheTable
 		friend class DeleteCacheEntry;
 	    friend class WriteOneCacheEntry;
+	    friend class WriteOneCacheEntryToFILE;
 	    friend class DeleteExpired;
 	    friend class DeleteByHits;
 	    friend class DeleteBySize;
@@ -160,19 +188,25 @@ public:
 	    bool is_no_cache() { return no_cache; }
 	    
 	    void lock() {
-	        DBG(cerr << "Locking entry... (" << hex << &d_lock << dec << ") ");
+#if 0
+	    	DBG(cerr << "Locking entry... (" << hex << &d_lock << dec << ") ");
 	    	LOCK(&d_lock);
 	        DBGN(cerr << "Done" << endl);
+#endif
 	    }
 	    void unlock() {
-	        DBG(cerr << "Unlocking entry... (" << hex << &d_lock << dec << ") ");
+#if 0
+	    	DBG(cerr << "Unlocking entry... (" << hex << &d_lock << dec << ") ");
 	    	UNLOCK(&d_lock);
 	        DBGN(cerr << "Done" << endl);
+#endif
 	    }
+#if 0
 	    pthread_mutex_t &get_lock() { return d_lock; }
-	    
+#endif	    
 	    void lock_read_response() {
-	        DBG(cerr << "Try locking read response... (" << hex << &d_response_lock << dec << ") ");
+#if 0
+	    	DBG(cerr << "Try locking read response... (" << hex << &d_response_lock << dec << ") ");
 	        int status = TRYLOCK(&d_response_lock);
 	        if (status != 0 /*&& status == EBUSY*/) {
 	    		// If locked, wait for any writers
@@ -181,51 +215,64 @@ public:
 	    	}
 	        DBGN(cerr << "Done" << endl);
 	        readers++;			// REcord number of readers
+#endif
 	    }
 	    
 	    void unlock_read_response() {
-			readers--;
+#if 0
+	    	readers--;
 			if (readers == 0) {
 				DBG(cerr << "Unlocking read response... (" << hex << &d_response_lock << dec << ") ");
 				UNLOCK(&d_response_lock);
 				DBGN(cerr << "Done" << endl);
 			}
-		}
+#endif
+	    }
 	    
 	    void lock_write_response() {
-	        DBG(cerr << "locking write response... (" << hex << &d_response_lock << dec << ") ");
+#if 0
+	    	DBG(cerr << "locking write response... (" << hex << &d_response_lock << dec << ") ");
 	    	LOCK(&d_response_lock);
 	    	LOCK(&d_response_write_lock);
 	        DBGN(cerr << "Done" << endl);
+#endif
 	    }
 	    
 	    void unlock_write_response() {
-	        DBG(cerr << "Unlocking write response... (" << hex << &d_response_lock << dec << ") ");
+#if 0
+	    	DBG(cerr << "Unlocking write response... (" << hex << &d_response_lock << dec << ") ");
     		UNLOCK(&d_response_write_lock);
 	    	UNLOCK(&d_response_lock);
 	        DBGN(cerr << "Done" << endl);
+#endif
 	    }
 	    
 	    CacheEntry() :
-			url(""), hash(-1), hits(0), cachename(""), etag(""), lm(-1),
+			url(""), /*hash(-1),*/ hits(0), cachename(""), etag(""), lm(-1),
 					expires(-1), date(-1), age(-1), max_age(-1), size(0),
 					range(false), freshness_lifetime(0), response_time(0),
 					corrected_initial_age(0), must_revalidate(false),
-					no_cache(false), readers(0) {
+					no_cache(false), readers(0), writer(0) {
+#if 0
 	    	INIT(&d_response_lock);
 	    	INIT(&d_response_write_lock);
 			INIT(&d_lock);
-		}
+#endif
+	    }
 		CacheEntry(const string &u) :
-			url(u), hash(-1), hits(0), cachename(""), etag(""), lm(-1),
+			url(u), /*hash(-1),*/ hits(0), cachename(""), etag(""), lm(-1),
 					expires(-1), date(-1), age(-1), max_age(-1), size(0),
 					range(false), freshness_lifetime(0), response_time(0),
 					corrected_initial_age(0), must_revalidate(false),
-					no_cache(false), readers(0) {
-	    	INIT(&d_response_lock);
+					no_cache(false), readers(0), writer(0) {
+#if 0
+			INIT(&d_response_lock);
 	    	INIT(&d_response_write_lock);
 			INIT(&d_lock);
+#endif
+#if 0
 			hash = get_hash(url);
+#endif
 		}
 	};
 
@@ -234,21 +281,28 @@ public:
 	// Entries with matching hashes occupy successive positions in the inner
 	// vector (that's how hash collisions are resolved). Search the inner
 	// vector for a specific match.
+#if 0
 	typedef vector<CacheEntry *> CacheEntries;
 	typedef CacheEntries::iterator CacheEntriesIter;
 
 	typedef CacheEntries **CacheTable;// Array of pointers to CacheEntries
-
+#endif
 	friend class HTTPCacheTest;
 	
 private:
-	CacheTable d_cache_table;
+#if 0
+	CacheTable d_cache_table; // ***
+#endif
+	DBHANDLE d_db;
+    int d_size_fd;
     
 	string d_cache_root;
     unsigned int d_block_size; // File block size.
+#if 0
     unsigned long d_current_size;
-
-    string d_cache_index;
+    string d_cache_index; //***
+#endif
+    string d_cache_db;
     int d_new_entries;
     
     map<FILE *, HTTPCacheTable::CacheEntry *> d_locked_entries;
@@ -265,21 +319,84 @@ private:
 	HTTPCacheTable() {
 		throw InternalErr(__FILE__, __LINE__, "unimplemented");
 	}
-
+#if 0
 	CacheTable &get_cache_table() { return d_cache_table; }
+#endif
 	CacheEntry *get_locked_entry_from_cache_table(int hash, const string &url); /*const*/
-	
+    string get_hash_directory();	
+
 public:
 	HTTPCacheTable(const string &cache_root, int block_size);
 	~HTTPCacheTable();
 	
 	//@{ @name Accessors/Mutators
-	unsigned long get_current_size() const { return d_current_size; }
-	void set_current_size(unsigned long sz) { d_current_size = sz; }
+
+	unsigned long get_current_size() const {
+		if (readw_lock(d_size_fd, 0, SEEK_SET, 0) < 0)
+			throw InternalErr(__FILE__, __LINE__, "Could not lock size file");
+		long size;
+		try {
+			if (lseek(d_size_fd, 0, SEEK_SET) < 0)
+				throw InternalErr(__FILE__, __LINE__, "Could not seek size file");
+			if (read(d_size_fd, &size, sizeof(long)) < 0)
+				throw InternalErr(__FILE__, __LINE__, "Could not read size file");
+			if (un_lock(d_size_fd, 0, SEEK_SET, 0) < 0)
+				throw InternalErr(__FILE__, __LINE__, "Could not unlock size file");
+		}
+		catch(...) {
+			un_lock(d_size_fd, (off_t)0, SEEK_SET, (off_t)0);
+			throw;
+		}
+		return size;
+	}
 	
+	void set_current_size(long sz) { 
+		if (writew_lock(d_size_fd, 0, SEEK_SET, 0) < 0)
+			throw InternalErr(__FILE__, __LINE__, "Could not lock size file");
+		try {
+			if (lseek(d_size_fd, 0, SEEK_SET) < 0)
+				throw InternalErr(__FILE__, __LINE__, "Could not seek size file");
+			if (write(d_size_fd, &sz, sizeof(long)) < 0)
+				throw InternalErr(__FILE__, __LINE__, "Could not write size ");
+			if (un_lock(d_size_fd, 0, SEEK_SET, 0) < 0)
+				throw InternalErr(__FILE__, __LINE__, "Could not unlock size file");
+		}
+		catch(...) {
+			un_lock(d_size_fd, 0, SEEK_SET, 0);
+			throw;
+		}
+	}
+	
+	void update_current_size(long sz) { 
+		if (writew_lock(d_size_fd, 0, SEEK_SET, 0) < 0)
+			throw InternalErr(__FILE__, __LINE__, "Could not lock size file");
+
+		try {
+			long size;
+			if (lseek(d_size_fd, 0, SEEK_SET) < 0)
+				throw InternalErr(__FILE__, __LINE__, "Could not seek size file");
+			if (read(d_size_fd, &size, sizeof(long)) < 0)
+				throw InternalErr(__FILE__, __LINE__, "Could not read size file");
+			
+			size = max((long)0, size + sz); // sz might be negative
+			if (lseek(d_size_fd, 0, SEEK_SET) < 0)
+				throw InternalErr(__FILE__, __LINE__, "Could not seek size file");
+			if (write(d_size_fd, &size, sizeof(long)) < 0)
+				throw InternalErr(__FILE__, __LINE__, "Could not write size ");
+			
+			if (un_lock(d_size_fd, 0, SEEK_SET, 0) < 0)
+				throw InternalErr(__FILE__, __LINE__, "Could not unlock size file");
+		}
+		catch(...) {
+			un_lock(d_size_fd, (off_t)0, SEEK_SET, (off_t)0);
+			throw;
+		}
+	}
+		
 	unsigned int get_block_size() const { return d_block_size; }
 	void set_block_size(unsigned int sz) { d_block_size = sz; }
 	
+	// Remove these - new DB won't need them
 	int get_new_entries() const { return d_new_entries; }
 	void increment_new_entries() { ++d_new_entries; }
 	
@@ -287,27 +404,31 @@ public:
 	void set_cache_root(const string &cr) { d_cache_root = cr; }
 	//@}
 
+	// Implement this using nextrec from db
 	void delete_expired_entries(time_t time = 0);
 	void delete_by_hits(int hits);
 	void delete_by_size(unsigned int size);
+#if 0
+	// Used by purge_cache()
 	void delete_all_entries();
-	
+#endif	
+	// Don't need these
 	bool cache_index_delete();
 	bool cache_index_read();
 	CacheEntry *cache_index_parse_line(const char *line);
 	void cache_index_write();
-	
-    string create_hash_directory(int hash);
+
     void create_location(CacheEntry *entry);
 
-	void add_entry_to_cache_table(CacheEntry *entry);
+    // This should write the entry to the DB
+	void add_new_entry_to_cache_table(CacheEntry *entry);
 	void remove_cache_entry(HTTPCacheTable::CacheEntry *entry);
 
 	void remove_entry_from_cache_table(const string &url);
 	CacheEntry *get_locked_entry_from_cache_table(const string &url);
 	CacheEntry *get_write_locked_entry_from_cache_table(const string &url);
 
-	void calculate_time(HTTPCacheTable::CacheEntry *entry,
+	void calculate_times(HTTPCacheTable::CacheEntry *entry,
 			int default_expiration, time_t request_time);
 	void parse_headers(HTTPCacheTable::CacheEntry *entry, 
 			unsigned long max_entry_size, const vector<string> &headers);
@@ -315,7 +436,10 @@ public:
 	// These should move back to HTTPCache
 	void bind_entry_to_data(CacheEntry *entry, FILE *body);
 	void uncouple_entry_from_data(FILE *body);
+#if 0
+	// Used when purging the cache
 	bool is_locked_read_responses();
+#endif
 };
 
 } // namespace libdap

@@ -196,7 +196,8 @@ private:
     // These will go away when the cache can be used by multiple processes.
     bool get_single_user_lock(bool force = false);
     void release_single_user_lock();
-    
+
+    // used for testing
     bool is_url_in_cache(const string &url);
 
     // I made these four methods so they could be tested by HTTPCacheTest.
@@ -274,8 +275,9 @@ public:
     FILE *get_cached_response(const string &url);
 
     void release_cached_response(FILE *response);
-
+#if 0
     void purge_cache();
+#endif
 };
 
 } // namespace libdap

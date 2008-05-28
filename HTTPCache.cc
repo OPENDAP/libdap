@@ -38,6 +38,8 @@
 #include <iterator>
 #include <set>
 
+#define DODS_DEBUG
+
 #include "Error.h"
 #include "InternalErr.h"
 #include "ResponseTooBigErr.h"
@@ -383,13 +385,14 @@ HTTPCache::perform_garbage_collection()
 
     // Remove all the expired responses.
     expired_gc();
-
+#if 0
     // Remove entries larger than max_entry_size. 
     too_big_gc();
     
     // Remove entries starting with zero hits, 1, ..., until stopGC() 
     // returns true.
     hits_gc();
+#endif
 }
 
 /** Scan the current cache table and remove anything that has expired. Don't
@@ -598,7 +601,7 @@ HTTPCache::set_cache_root(const string &root)
     }
     
     // Test d_hhtp_cache_table because this method can be called before that
-    // instance is created and also can be called later to cahnge the cache
+    // instance is created and also can be called later to change the cache
     // root. jhrg 05.14.08
     if (d_http_cache_table)
     	d_http_cache_table->set_cache_root(d_cache_root);
@@ -912,9 +915,10 @@ HTTPCache::get_cache_control()
 
 /** Look in the cache for the given \c url. Is it in the cache table?
 
+	A private method used for testing.
+	
     This method locks the class' interface.
 
-	@todo Remvoe this is broken.
     @param url The url to look for.
     @return True if \c url is found, otherwise False. */
 
@@ -1165,13 +1169,15 @@ HTTPCache::cache_response(const string &url, time_t request_time,
             }
 
             // corrected_initial_age, freshness_lifetime, response_time.
-            d_http_cache_table->calculate_time(entry, d_default_expiration, request_time);
+            d_http_cache_table->calculate_times(entry, d_default_expiration, request_time);
 
             d_http_cache_table->create_location(entry); // cachename, cache_body_fd
             // move these write function to cache table
             entry->set_size(write_body(entry->get_cachename(), body));
             write_metadata(entry->get_cachename(), headers);
-            d_http_cache_table->add_entry_to_cache_table(entry);
+            
+            d_http_cache_table->add_new_entry_to_cache_table(entry);
+            
             entry->unlock_write_response();
         }
         catch (ResponseTooBigErr &e) {
@@ -1313,7 +1319,7 @@ HTTPCache::update_response(const string &url, time_t request_time,
         d_http_cache_table->parse_headers(entry, d_max_entry_size, headers);
 
         // Update corrected_initial_age, freshness_lifetime, response_time.
-        d_http_cache_table->calculate_time(entry, d_default_expiration, request_time);
+        d_http_cache_table->calculate_times(entry, d_default_expiration, request_time);
 
         // Merge the new headers with those in the persistent store. How:
         // Load the new headers into a set, then merge the old headers. Since
@@ -1477,6 +1483,7 @@ FILE * HTTPCache::get_cached_response(const string &url,
 
     try {
         entry = d_http_cache_table->get_locked_entry_from_cache_table(url);
+        DBG(cerr<< "entry: " << entry << endl);
         if (!entry) {
         	unlock_cache_interface();
         	return 0;
@@ -1569,6 +1576,7 @@ HTTPCache::release_cached_response(FILE *body)
     unlock_cache_interface();
 }
 
+#if 0
 /** Purge both the in-memory cache table and the contents of the cache on
     disk. This method deletes every entry in the persistent store but leaves
     the structure intact. The client of HTTPCache is responsible for making
@@ -1599,5 +1607,5 @@ HTTPCache::purge_cache()
 
     unlock_cache_interface();
 }
-
+#endif
 } // namespace libdap

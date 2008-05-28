@@ -17,8 +17,8 @@
  * These are used to construct records in the
  * index file and data file.
  */
-#define IDXLEN_SZ	   4	/* index record length (ASCII chars) */
-#define SEP         ':'	/* separator char in index record */
+#define IDXLEN_SZ	 4 /* index record length (ASCII chars) */
+#define SEP         '#' /* was ':' (jhrg) separator char in index record */
 #define SPACE       ' '	/* space character */
 #define NEWLINE     '\n'	/* newline character */
 
@@ -28,7 +28,7 @@
  */
 #define PTR_SZ        6	/* size of ptr field in hash chain */
 #define PTR_MAX  999999	/* max file offset = 10**PTR_SZ - 1 */
-#define NHASH_DEF	 137	/* default hash table size */
+#define NHASH_DEF	 1499 /* was 137 (jhrg) default hash table size */
 #define FREE_OFF      0	/* free list offset in index file */
 #define HASH_OFF PTR_SZ	/* hash table offset in index file */
 
@@ -67,6 +67,7 @@ typedef struct {
   COUNT  cnt_stor3;    /* store: DB_REPLACE, diff len, appended */
   COUNT  cnt_stor4;    /* store: DB_REPLACE, same len, overwrote */
   COUNT  cnt_storerr;  /* store error */
+  int 	 update_rec_found; /* in the update functions, was the record found? */
 } DB;
 
 int		lock_reg(int, int, int, off_t, int, off_t); /* {Prog lockreg} */
@@ -90,7 +91,7 @@ void	err_sys(const char *, ...);
  */
 static DB     *_db_alloc(int);
 static void    _db_dodelete(DB *);
-static int	    _db_find_and_lock(DB *, const char *, int);
+static int	   _db_find_and_lock(DB *, const char *, int);
 static int     _db_findfree(DB *, int, int);
 static void    _db_free(DB *);
 static DBHASH  _db_hash(DB *, const char *);
@@ -154,7 +155,11 @@ db_open(const char *pathname, int oflag, ...)
 		return(NULL);
 	}
 
+	if ((oflag & O_CREAT) | (oflag & O_TRUNC)) {
+#if 0
+	// Fix. When opened with O_CREAT and not O_TRUNC make sure to init.
 	if ((oflag & (O_CREAT | O_TRUNC)) == (O_CREAT | O_TRUNC)) {
+#endif
 		/*
 		 * If the database was created, we have to initialize
 		 * it.  Write lock the entire file so that we can stat
@@ -402,9 +407,10 @@ _db_readidx(DB *db, off_t offset)
 	db->ptrval = atol(asciiptr); /* offset of next key in chain */
 
 	asciilen[IDXLEN_SZ] = 0;     /* null terminate */
+	/* fprintf(stderr, "db->idxlen: %d\n", atoi(asciilen)); */
 	if ((db->idxlen = atoi(asciilen)) < IDXLEN_MIN ||
 	  db->idxlen > IDXLEN_MAX)
-		err_dump("_db_readidx: invalid length");
+		err_dump("_db_readidx1: invalid length");
 
 	/*
 	 * Now read the actual index record.  We read it into the key
@@ -436,7 +442,7 @@ _db_readidx(DB *db, off_t offset)
 	if ((db->datoff = atol(ptr1)) < 0)
 		err_dump("_db_readidx: starting offset < 0");
 	if ((db->datlen = atol(ptr2)) <= 0 || db->datlen > DATLEN_MAX)
-		err_dump("_db_readidx: invalid length");
+		err_dump("_db_readidx2: invalid length");
 	return(db->ptrval);		/* return offset of next key in chain */
 }
 
@@ -767,6 +773,297 @@ db_store(DBHANDLE h, const char *key, const char *data, int flag)
 doreturn:	/* unlock hash chain locked by _db_find_and_lock */
 	if (un_lock(db->idxfd, db->chainoff, SEEK_SET, 1) < 0)
 		err_dump("db_store: un_lock error");
+	return(rc);
+}
+
+#if 0
+/* This is broken. Testing a lock from within the process that holds it
+ * does not work because the lock can be aquired by the owning process. */
+
+/* This is here mostly for testing.
+ * Return: 1 if write locked, -1 if read locked and 0 if not locked */
+int 
+db_is_key_locked(DBHANDLE h, const char *key) 
+{
+	DB *db = h;
+	off_t chainoff;
+	struct flock	lock;
+
+	/*
+	 * Calculate the hash value for this key, then calculate the
+	 * byte offset of corresponding chain ptr in hash table.
+	 * This is where our search starts.  First we calculate the
+	 * offset in the hash table for this key.
+	 */
+	chainoff = (_db_hash(db, key) * PTR_SZ) + db->hashoff;
+	fprintf(stderr, "chainoff: %ld\n", chainoff);
+	lock.l_type = 0;		/* F_RDLCK, F_WRLCK, F_UNLCK */
+	lock.l_start = chainoff;	/* byte offset, relative to l_whence */
+	lock.l_whence = SEEK_SET;	/* SEEK_SET, SEEK_CUR, SEEK_END */
+	lock.l_len = 1;		/* #bytes (0 means to EOF) */
+
+	if (fcntl(db->idxfd, F_GETLK, &lock) < 0)
+		err_dump("db_is_key_locked: Could not get lock info!");
+	
+	if (lock.l_type == F_WRLCK)
+		return 1;
+	else if (lock.l_type == F_RDLCK)
+		return -1;
+	else
+		return 0;
+}
+#endif
+/*
+ * Write lock and acces an entry for update. 
+ * 
+ * Write lock as with db_store(..., BD_REPLACE) but return the current
+ * record while it's locked so that it can be updated without being
+ * modified by another process. When done call db_finish_write_update()
+ * to write the updated entry.
+ * 
+ * This must deal with the case where the key/data do not exist in the db since
+ * they might have just been removed by another process.
+ * 
+ * Return the data as the result and the info needed to release the lock as
+ * a value-result parameter (db)
+ */
+char *
+db_start_write_update(DBHANDLE h, const char *key)
+{
+	DB		*db = h;
+
+	/*
+	 * _db_find_and_lock calculates which hash table this new record
+	 * goes into (db->chainoff), regardless of whether it already
+	 * exists or not. The following calls to _db_writeptr change the
+	 * hash table entry for this chain to point to the new record.
+	 * The new record is added to the front of the hash chain.
+	 */
+	if ((db->update_rec_found = _db_find_and_lock(db, key, 1)) < 0) {
+		return 0;
+	}
+	else {
+		char *ptr = _db_readdat(db); /* return pointer to data */
+		db->cnt_fetchok++;
+		return ptr;
+	}
+}
+
+/*
+ * Write the updated record and then change the lock from a write lock to 
+ * a write lock.
+ * 
+ * Return a pointer to the new record.
+ */
+char *
+db_write_update_and_read_lock(DBHANDLE h, const char *key, const char *data)
+{
+	DB		*db = h;
+	int		keylen, datlen;
+	off_t	ptrval;
+
+	keylen = strlen(key);
+	datlen = strlen(data) + 1;		/* +1 for newline at end */
+	if (datlen < DATLEN_MIN || datlen > DATLEN_MAX)
+		err_dump("db_write_update_and_read_lock: invalid data length");
+
+	/*
+	 * _db_find_and_lock calculates which hash table this new record
+	 * goes into (db->chainoff), regardless of whether it already
+	 * exists or not. The following calls to _db_writeptr change the
+	 * hash table entry for this chain to point to the new record.
+	 * The new record is added to the front of the hash chain.
+	 */
+	if (db->update_rec_found < 0) { /* record not found */
+		/*
+		 * _db_find_and_lock locked the hash chain for us; read
+		 * the chain ptr to the first index record on hash chain.
+		 */
+		ptrval = _db_readptr(db, db->chainoff);
+
+		if (_db_findfree(db, keylen, datlen) < 0) {
+			/*
+			 * Can't find an empty record big enough. Append the
+			 * new record to the ends of the index and data files.
+			 */
+			_db_writedat(db, data, 0, SEEK_END);
+			_db_writeidx(db, key, 0, SEEK_END, ptrval);
+
+			/*
+			 * db->idxoff was set by _db_writeidx.  The new
+			 * record goes to the front of the hash chain.
+			 */
+			_db_writeptr(db, db->chainoff, db->idxoff);
+			db->cnt_stor1++;
+		} else {
+			/*
+			 * Reuse an empty record. _db_findfree removed it from
+			 * the free list and set both db->datoff and db->idxoff.
+			 * Reused record goes to the front of the hash chain.
+			 */
+			_db_writedat(db, data, db->datoff, SEEK_SET);
+			_db_writeidx(db, key, db->idxoff, SEEK_SET, ptrval);
+			_db_writeptr(db, db->chainoff, db->idxoff);
+			db->cnt_stor2++;
+		}
+	} else {						/* record found */
+		/*
+		 * We are replacing an existing record.  We know the new
+		 * key equals the existing key, but we need to check if
+		 * the data records are the same size.
+		 */
+		if (datlen != db->datlen) {
+			_db_dodelete(db);	/* delete the existing record */
+
+			/*
+			 * Reread the chain ptr in the hash table
+			 * (it may change with the deletion).
+			 */
+			ptrval = _db_readptr(db, db->chainoff);
+
+			/*
+			 * Append new index and data records to end of files.
+			 */
+			_db_writedat(db, data, 0, SEEK_END);
+			_db_writeidx(db, key, 0, SEEK_END, ptrval);
+
+			/*
+			 * New record goes to the front of the hash chain.
+			 */
+			_db_writeptr(db, db->chainoff, db->idxoff);
+			db->cnt_stor3++;
+		} else {
+			/*
+			 * Same size data, just replace data record.
+			 */
+			_db_writedat(db, data, db->datoff, SEEK_SET);
+			db->cnt_stor4++;
+		}
+	}
+
+	/* Change the lock is changes to a read lock. */
+	if ((db->update_rec_found = _db_find_and_lock(db, key, 0)) < 0) {
+		err_dump("db_write_update_and_read_lock: could not find update");
+	}
+	else {
+		char *ptr = _db_readdat(db); /* return pointer to data */
+		db->cnt_fetchok++;
+		return ptr;
+	}
+	
+	return 0;
+}
+
+/*
+ * Unlock an entry.
+ */
+void
+db_read_unlock(DBHANDLE h, const char *key)
+{
+	DB		*db = h;
+#if 0	
+	if (db_is_key_locked(db, key) != -1)
+		err_dump("db_read_unlock: record is not read locked!");
+#endif
+	if (un_lock(db->idxfd, db->chainoff, SEEK_SET, 1) < 0)
+		err_dump("db_read_unlock: un_lock error");
+}
+
+/* Given that an entry was write locked using db_start_write_update(), write
+ * the new data and unlock.
+ * 
+ * Return: 0 if successful, otherwise an error ocurred. */
+int
+db_finish_write_update(DBHANDLE h, const char *key, const char *data)
+{
+	DB		*db = h;
+	int		rc, keylen, datlen;
+	off_t	ptrval;
+
+	keylen = strlen(key);
+	datlen = strlen(data) + 1;		/* +1 for newline at end */
+	if (datlen < DATLEN_MIN || datlen > DATLEN_MAX)
+		err_dump("db_finish_write_update: invalid data length");
+
+	/*
+	 * _db_find_and_lock calculates which hash table this new record
+	 * goes into (db->chainoff), regardless of whether it already
+	 * exists or not. The following calls to _db_writeptr change the
+	 * hash table entry for this chain to point to the new record.
+	 * The new record is added to the front of the hash chain.
+	 */
+	if (db->update_rec_found < 0) { /* record not found */
+
+		/*
+		 * _db_find_and_lock locked the hash chain for us; read
+		 * the chain ptr to the first index record on hash chain.
+		 */
+		ptrval = _db_readptr(db, db->chainoff);
+
+		if (_db_findfree(db, keylen, datlen) < 0) {
+			/*
+			 * Can't find an empty record big enough. Append the
+			 * new record to the ends of the index and data files.
+			 */
+			_db_writedat(db, data, 0, SEEK_END);
+			_db_writeidx(db, key, 0, SEEK_END, ptrval);
+
+			/*
+			 * db->idxoff was set by _db_writeidx.  The new
+			 * record goes to the front of the hash chain.
+			 */
+			_db_writeptr(db, db->chainoff, db->idxoff);
+			db->cnt_stor1++;
+		} else {
+			/*
+			 * Reuse an empty record. _db_findfree removed it from
+			 * the free list and set both db->datoff and db->idxoff.
+			 * Reused record goes to the front of the hash chain.
+			 */
+			_db_writedat(db, data, db->datoff, SEEK_SET);
+			_db_writeidx(db, key, db->idxoff, SEEK_SET, ptrval);
+			_db_writeptr(db, db->chainoff, db->idxoff);
+			db->cnt_stor2++;
+		}
+	} else {						/* record found */
+		/*
+		 * We are replacing an existing record.  We know the new
+		 * key equals the existing key, but we need to check if
+		 * the data records are the same size.
+		 */
+		if (datlen != db->datlen) {
+			_db_dodelete(db);	/* delete the existing record */
+
+			/*
+			 * Reread the chain ptr in the hash table
+			 * (it may change with the deletion).
+			 */
+			ptrval = _db_readptr(db, db->chainoff);
+
+			/*
+			 * Append new index and data records to end of files.
+			 */
+			_db_writedat(db, data, 0, SEEK_END);
+			_db_writeidx(db, key, 0, SEEK_END, ptrval);
+
+			/*
+			 * New record goes to the front of the hash chain.
+			 */
+			_db_writeptr(db, db->chainoff, db->idxoff);
+			db->cnt_stor3++;
+		} else {
+			/*
+			 * Same size data, just replace data record.
+			 */
+			_db_writedat(db, data, db->datoff, SEEK_SET);
+			db->cnt_stor4++;
+		}
+	}
+	rc = 0;		/* OK */
+
+	if (un_lock(db->idxfd, db->chainoff, SEEK_SET, 1) < 0)
+		err_dump("db_finish_write_update: un_lock error");
+	
 	return(rc);
 }
 

@@ -4,9 +4,9 @@ AUTOMAKE_OPTIONS = foreign
 AM_CPPFLAGS = -Wall
 
 check_PROGRAMS = t4
-noinst_LIBRARIES = libapue_db.a
+noinst_LTLIBRARIES = libapue_db.la
 
-libapue_db_a_SOURCES = error.c lockreg.c db.c
+libapue_db_la_SOURCES = error.c lockreg.c db.c apue_db.h
 
 t4_SOURCES = t4.c
 t4_LDADD = -L. -lapue_db
