@@ -7,7 +7,7 @@ aclocaldir=$(datadir)/aclocal
 pkgconfigdir=$(libdir)/pkgconfig
 
 # Arrange to build with the backward compatibility mode enabled.
-AM_CPPFLAGS = -I$(top_srcdir)/gl -I$(top_srcdir)/GNU
+AM_CPPFLAGS = -I$(top_srcdir)/gl -I$(top_srcdir)/apue_db -I$(top_srcdir)/GNU
 AM_CXXFLAGS = 
 if COMPILER_IS_GCC
 AM_CXXFLAGS += -Wall -W -Wcast-align
@@ -23,8 +23,8 @@ AM_LFLAGS = -8
 CXXFLAGS_DEBUG = -g3 -O0 -fno-defer-pop -Wall -W -Wcast-align -Werror
 TEST_COV_FLAGS = -ftest-coverage -fprofile-arcs
 
-SUBDIRS = gl . tests unit-tests
-DIST_SUBDIRS = unit-tests gl tests
+SUBDIRS = gl apue_db . tests unit-tests
+DIST_SUBDIRS = unit-tests gl apue_db tests
 
 lib_LTLIBRARIES = libdap.la libdapclient.la libdapserver.la
 
@@ -46,7 +46,7 @@ libdap_la_LIBADD = $(XML2_LIBS) $(PTHREAD_LIBS) gl/libgnu.la
 
 libdapclient_la_LDFLAGS = -version-info $(CLIENTLIB_VERSION)
 libdapclient_la_CPPFLAGS = $(AM_CPPFLAGS) $(CURL_CFLAGS) $(XML2_CFLAGS)
-libdapclient_la_LIBADD = $(CURL_LIBS) libdap.la $(PTHREAD_LIBS)
+libdapclient_la_LIBADD = $(CURL_LIBS) libdap.la $(PTHREAD_LIBS) apue_db/libapue_db.la
 
 libdapserver_la_LDFLAGS = -version-info $(SERVERLIB_VERSION)
 libdapserver_la_LIBADD = libdap.la
@@ -55,7 +55,7 @@ pkginclude_HEADERS = $(DAP_HDR) $(GNU_HDR) $(CLIENT_HDR) $(SERVER_HDR)
 noinst_HEADERS = config_dap.h
 
 getdap_SOURCES = getdap.cc
-getdap_LDADD = libdapclient.la libdap.la 
+getdap_LDADD = libdapclient.la libdap.la
 
 deflate_SOURCES = deflate.c
 deflate_LDADD = $(ZLIB_LIBS)
@@ -221,7 +221,7 @@ CLIENT_SRC = RCReader.cc Connect.cc HTTPConnect.cc HTTPCache.cc		\
 	AISResources.cc AISDatabaseParser.cc AISMerge.cc AISConnect.cc  \
 	util_mit.cc ResponseTooBigErr.cc HTTPCacheTable.cc
 
-SERVER_SRC = DODSFilter.cc cgi_util.cc Ancillary.cc
+SERVER_SRC = DODSFilter.cc cgi_util.cc
 
 DAP_HDR = AttrTable.h DAS.h DDS.h DataDDS.h DDXParser.h DDXExceptions.h	   \
 	BaseType.h Byte.h Int32.h Float64.h Str.h Url.h Vector.h Array.h   \
@@ -258,7 +258,7 @@ CLIENT_HDR = RCReader.h Connect.h HTTPConnect.h HTTPCache.h		 \
 	AISConnect.h AISMerge.h AISExceptions.h AISDatabaseParser.h	 \
 	AISResources.h Resource.h HTTPCacheTable.h
 
-SERVER_HDR = DODSFilter.h cgi_util.h AlarmHandler.h EventHandler.h Ancillary.h
+SERVER_HDR = DODSFilter.h cgi_util.h AlarmHandler.h EventHandler.h
 
 ############################################################################
 # Special rules for the grammars. I tried to use the automake grammar support

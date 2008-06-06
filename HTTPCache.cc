@@ -38,6 +38,8 @@
 #include <iterator>
 #include <set>
 
+#define DODS_DEBUG
+
 #include "Error.h"
 #include "InternalErr.h"
 #include "ResponseTooBigErr.h"
@@ -235,8 +237,7 @@ HTTPCache::delete_instance()
     will hold the cache data.
     @param force Force access to the persistent store!
     @exception Error Thrown if the single user/process lock for the
-    persistent store cannot be obtained.
-    @see cache_index_read */
+    persistent store cannot be obtained. */
 
 HTTPCache::HTTPCache(string cache_root, bool force) :
         d_locked_open_file(0),
@@ -316,8 +317,9 @@ HTTPCache::~HTTPCache()
     try {
         if (startGC())
             perform_garbage_collection();
-
+#if 0
         d_http_cache_table->cache_index_write();
+#endif
     }
     catch (Error &e) {
         // If the cache index cannot be written, we've got problems. However,
@@ -383,13 +385,14 @@ HTTPCache::perform_garbage_collection()
 
     // Remove all the expired responses.
     expired_gc();
-
+#if 0
     // Remove entries larger than max_entry_size. 
     too_big_gc();
     
     // Remove entries starting with zero hits, 1, ..., until stopGC() 
     // returns true.
     hits_gc();
+#endif
 }
 
 /** Scan the current cache table and remove anything that has expired. Don't
@@ -598,7 +601,7 @@ HTTPCache::set_cache_root(const string &root)
     }
     
     // Test d_hhtp_cache_table because this method can be called before that
-    // instance is created and also can be called later to cahnge the cache
+    // instance is created and also can be called later to change the cache
     // root. jhrg 05.14.08
     if (d_http_cache_table)
     	d_http_cache_table->set_cache_root(d_cache_root);
@@ -721,7 +724,9 @@ HTTPCache::set_max_size(unsigned long size)
 
         if (new_size < old_size && startGC()) {
             perform_garbage_collection();
+#if 0
             d_http_cache_table->cache_index_write();
+#endif
         }
     }
     catch (...) {
@@ -766,7 +771,9 @@ HTTPCache::set_max_entry_size(unsigned long size)
             d_max_entry_size = new_size;
             if (new_size < old_size && startGC()) {
                 perform_garbage_collection();
+#if 0
                 d_http_cache_table->cache_index_write();
+#endif
             }
         }
     }
@@ -912,9 +919,10 @@ HTTPCache::get_cache_control()
 
 /** Look in the cache for the given \c url. Is it in the cache table?
 
+	A private method used for testing.
+	
     This method locks the class' interface.
 
-	@todo Remvoe this is broken.
     @param url The url to look for.
     @return True if \c url is found, otherwise False. */
 
@@ -923,12 +931,15 @@ HTTPCache::is_url_in_cache(const string &url)
 {
     DBG(cerr << "Is this url in the cache? (" << url << ")" << endl);
 
-    HTTPCacheTable::CacheEntry *entry = d_http_cache_table->get_locked_entry_from_cache_table(url);
+    HTTPCacheTable::CacheEntry *entry = d_http_cache_table->read_entry(url);
     bool status = entry != 0;
+    delete entry;
+#if 0
     if (entry) {
     	entry->unlock();
         entry->unlock_read_response();
     }
+#endif
     return  status;
 }
 
@@ -1165,13 +1176,15 @@ HTTPCache::cache_response(const string &url, time_t request_time,
             }
 
             // corrected_initial_age, freshness_lifetime, response_time.
-            d_http_cache_table->calculate_time(entry, d_default_expiration, request_time);
+            d_http_cache_table->calculate_times(entry, d_default_expiration, request_time);
 
             d_http_cache_table->create_location(entry); // cachename, cache_body_fd
             // move these write function to cache table
             entry->set_size(write_body(entry->get_cachename(), body));
             write_metadata(entry->get_cachename(), headers);
-            d_http_cache_table->add_entry_to_cache_table(entry);
+            
+            d_http_cache_table->add_new_entry_to_cache_table(entry);
+            
             entry->unlock_write_response();
         }
         catch (ResponseTooBigErr &e) {
@@ -1190,8 +1203,9 @@ HTTPCache::cache_response(const string &url, time_t request_time,
         if (d_http_cache_table->get_new_entries() > DUMP_FREQUENCY) {
             if (startGC())
                 perform_garbage_collection();
-
+#if 0
             d_http_cache_table->cache_index_write(); // resets new_entries
+#endif
         }
     }
     catch (...) {
@@ -1233,7 +1247,8 @@ HTTPCache::get_conditional_request_headers(const string &url)
     DBG(cerr << "Getting conditional request headers for " << url << endl);
 
     try {
-        entry = d_http_cache_table->get_locked_entry_from_cache_table(url);
+    	// A simple read will do (db_fetch())
+        entry = d_http_cache_table->read_entry(url);
         if (!entry)
             throw Error("There is no cache entry for the URL: " + url);
 
@@ -1255,17 +1270,22 @@ HTTPCache::get_conditional_request_headers(const string &url)
             headers.push_back(string("If-Modified-Since: ")
                               + date_time_str(&expires));
         }
-
+#if 0
 		entry->unlock();
 		entry->unlock_read_response();
-	    unlock_cache_interface();
+#endif
+		delete entry;
+		unlock_cache_interface();
     }
     catch (...) {
+    	delete entry;
 		unlock_cache_interface();
+#if 0
 		if (entry) {
 		    entry->unlock();
 			entry->unlock_read_response();
 		}
+#endif
 		throw;
 	}
 
@@ -1313,7 +1333,7 @@ HTTPCache::update_response(const string &url, time_t request_time,
         d_http_cache_table->parse_headers(entry, d_max_entry_size, headers);
 
         // Update corrected_initial_age, freshness_lifetime, response_time.
-        d_http_cache_table->calculate_time(entry, d_default_expiration, request_time);
+        d_http_cache_table->calculate_times(entry, d_default_expiration, request_time);
 
         // Merge the new headers with those in the persistent store. How:
         // Load the new headers into a set, then merge the old headers. Since
@@ -1360,7 +1380,7 @@ HTTPCache::update_response(const string &url, time_t request_time,
     response. This method should be used to determine if a cached response
     requires validation.
 
-    This method locks the class' interface and the cache entry.
+    This method locks the class' interface..
 
     @param url Find the cached response associated with this URL.
     @return True indicates that the response can be used, False indicates
@@ -1383,7 +1403,8 @@ HTTPCache::is_url_valid(const string &url)
             return false;  // force re-validation.
         }
 
-        entry = d_http_cache_table->get_locked_entry_from_cache_table(url);
+        // A simple read will do (db_fetch())
+        entry = d_http_cache_table->read_entry(url);
         if (!entry)
             throw Error("There is no cache entry for the URL: " + url);
 
@@ -1393,8 +1414,10 @@ HTTPCache::is_url_valid(const string &url)
         // In case this entry is of type "must-revalidate" then we consider it
         // invalid.
         if (entry->get_must_revalidate()) {
-            entry->unlock();
+#if 0
+        	entry->unlock();
             entry->unlock_read_response();
+#endif
             unlock_cache_interface();
             return false;
         }
@@ -1406,34 +1429,43 @@ HTTPCache::is_url_valid(const string &url)
         // given in the request cache control header is followed.
         if (d_max_age >= 0 && current_age > d_max_age) {
             DBG(cerr << "Cache....... Max-age validation" << endl);
+#if 0
             entry->unlock();
             entry->unlock_read_response();
+#endif
             unlock_cache_interface();
             return false;
         }
         if (d_min_fresh >= 0
             && entry->get_freshness_lifetime() < current_age + d_min_fresh) {
             DBG(cerr << "Cache....... Min-fresh validation" << endl);
+#if 0
             entry->unlock();
             entry->unlock_read_response();            
+#endif
             unlock_cache_interface();
             return false;
         }
 
         freshness = (entry->get_freshness_lifetime()
                      + (d_max_stale >= 0 ? d_max_stale : 0) > current_age);
-
+#if 0
         entry->unlock();
         entry->unlock_read_response();
+#endif
         unlock_cache_interface();
+        delete entry;
     }
     catch (...) {
+#if 0
     	if (entry) {
     		entry->unlock();
             entry->unlock_read_response();
     	}
+#endif
     	unlock_cache_interface();
-        throw;
+    	delete entry;
+    	throw;
     }
 
     return freshness;
@@ -1476,7 +1508,8 @@ FILE * HTTPCache::get_cached_response(const string &url,
     DBG(cerr << "Getting the cached response for " << url << endl);
 
     try {
-        entry = d_http_cache_table->get_locked_entry_from_cache_table(url);
+        entry = d_http_cache_table->read_lock_entry(url);
+        DBG(cerr<< "entry: " << entry << endl);
         if (!entry) {
         	unlock_cache_interface();
         	return 0;
@@ -1569,6 +1602,7 @@ HTTPCache::release_cached_response(FILE *body)
     unlock_cache_interface();
 }
 
+#if 0
 /** Purge both the in-memory cache table and the contents of the cache on
     disk. This method deletes every entry in the persistent store but leaves
     the structure intact. The client of HTTPCache is responsible for making
@@ -1599,5 +1633,5 @@ HTTPCache::purge_cache()
 
     unlock_cache_interface();
 }
-
+#endif
 } // namespace libdap

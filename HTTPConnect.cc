@@ -47,7 +47,7 @@ static char rcsid[] not_used =
 #include <cstdlib>
 #include <cstring>
 
-//#define DODS_DEBUG
+#define DODS_DEBUG
 //#define DODS_DEBUG2
 
 #include "debug.h"

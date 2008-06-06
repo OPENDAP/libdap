@@ -1,6 +1,10 @@
 #ifndef _APUE_DB_H
 #define _APUE_DB_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+	
 typedef	void *	DBHANDLE;
 
 DBHANDLE  db_open(const char *, int, ...);
@@ -10,6 +14,28 @@ int       db_store(DBHANDLE, const char *, const char *, int);
 int       db_delete(DBHANDLE, const char *);
 void      db_rewind(DBHANDLE);
 char     *db_nextrec(DBHANDLE, char *);
+
+/*
+ * These four functions provide a way for the DB to be used to contril access
+ * to files in a disk cache. Teh function db_start_write_update() accesses
+ * a record and leaves it write locked in the DB. The companion function 
+ * db_finish_write_update() writes the changed data and unlocks the entry.
+ * These functions are used to 'write lock' the cache while data are updated
+ * or added.
+ * 
+ * The remaining two functions are used to read lock the cache. This is done
+ * by first write locking, updating and then switching the lcok from write to
+ * read. The entry is unlocked using the db_read_unlock() function.
+ * 
+ * jhrg 5/28/08
+ */ 
+char     *db_start_write_update(DBHANDLE h, const char *key);
+int       db_finish_write_update(DBHANDLE h, const char *key, const char *data);
+
+char     *db_start_read(DBHANDLE h, const char *key);
+char     *db_write_update_and_read_lock(DBHANDLE h, const char *key, const char *data);
+void      db_read_unlock(DBHANDLE h, const char *key);
+
 
 /*
  * Flags for db_store().
@@ -25,5 +51,9 @@ char     *db_nextrec(DBHANDLE, char *);
 #define IDXLEN_MAX	1024	/* arbitrary */
 #define DATLEN_MIN	   2	/* data byte, newline */
 #define DATLEN_MAX	1024	/* arbitrary */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _APUE_DB_H */

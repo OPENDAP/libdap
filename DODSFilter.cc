@@ -62,7 +62,6 @@ static char rcsid[] not_used =
 #include "DDS.h"
 #include "debug.h"
 #include "cgi_util.h"
-#include "Ancillary.h"
 #include "util.h"
 #include "escaping.h"
 #include "DODSFilter.h"
@@ -496,7 +495,7 @@ DODSFilter::get_das_last_modified_time(const string &anc_location) const
         << " d_anc_file=" << d_anc_file << endl);
 
     string name
-    = Ancillary::find_ancillary_file(d_dataset, "das",
+    = find_ancillary_file(d_dataset, "das",
                           (anc_location == "") ? d_anc_dir : anc_location,
                           d_anc_file);
 
@@ -519,7 +518,7 @@ DODSFilter::get_dds_last_modified_time(const string &anc_location) const
         << " d_anc_file=" << d_anc_file << endl);
 
     string name
-    = Ancillary::find_ancillary_file(d_dataset, "dds",
+    = find_ancillary_file(d_dataset, "dds",
                           (anc_location == "") ? d_anc_dir : anc_location,
                           d_anc_file);
 
@@ -548,11 +547,11 @@ DODSFilter::get_data_last_modified_time(const string &anc_location) const
         << " d_anc_file=" << d_anc_file << endl);
 
     string dds_name
-    = Ancillary::find_ancillary_file(d_dataset, "dds",
+    = find_ancillary_file(d_dataset, "dds",
                           (anc_location == "") ? d_anc_dir : anc_location,
                           d_anc_file);
     string das_name
-    = Ancillary::find_ancillary_file(d_dataset, "das",
+    = find_ancillary_file(d_dataset, "das",
                           (anc_location == "") ? d_anc_dir : anc_location,
                           d_anc_file);
 
@@ -657,9 +656,18 @@ DODSFilter::establish_timeout(ostream &stream) const
 void
 DODSFilter::read_ancillary_das(DAS &das, const string &anc_location) const
 {
-    Ancillary::read_ancillary_das( das, d_dataset,
-			       (anc_location == "") ? d_anc_dir : anc_location,
-			       d_anc_file);
+    string name = find_ancillary_file(d_dataset, "das",
+                                      (anc_location == "") ? d_anc_dir : anc_location,
+                                      d_anc_file);
+
+    FILE *in = fopen(name.c_str(), "r");
+    if (in) {
+        das.parse(in);
+        int res = fclose(in) ;
+        if (res) {
+            DBG(cerr << "DODSFilter::read_ancillary_das - Failed to close file " << (void *)in << endl ;) ;
+        }
+    }
 }
 
 /** Read the ancillary DDS information and merge it into the input
@@ -674,9 +682,17 @@ DODSFilter::read_ancillary_das(DAS &das, const string &anc_location) const
 void
 DODSFilter::read_ancillary_dds(DDS &dds, const string &anc_location) const
 {
-    Ancillary::read_ancillary_dds( dds, d_dataset,
-			       (anc_location == "") ? d_anc_dir : anc_location,
-			       d_anc_file);
+    string name = find_ancillary_file(d_dataset, "dds",
+                                      (anc_location == "") ? d_anc_dir : anc_location,
+                                      d_anc_file);
+    FILE *in = fopen(name.c_str(), "r");
+    if (in) {
+        dds.parse(in);
+        int res = fclose(in) ;
+        if (res) {
+            DBG(cerr << "DODSFilter::read_ancillary_dds - Failed to close " << (void *)in << endl ;) ;
+        }
+    }
 }
 
 static const char *emessage = "DODS internal server error; usage error. Please report this to the dataset maintainer, or to the opendap-tech@opendap.org mailing list.";
