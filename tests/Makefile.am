@@ -5,7 +5,7 @@ EXTRA_DIST = GetDapTest.at $(TESTSUITE) atlocal.in $(srcdir)/package.m4 das-test
 TESTSUITE = $(srcdir)/GetDapTest
 
 check-local: atconfig atlocal $(TESTSUITE)
-        $(SHELL) '$(TESTSUITE)' $(TESTSUITEFLAGS)
+	$(SHELL) '$(TESTSUITE)' $(TESTSUITEFLAGS)
 
 # If we have check-local, then installcheck-local seems redundant. With it 
 # dist check runs the tests twice and there's really no difference in what's
@@ -17,26 +17,27 @@ check-local: atconfig atlocal $(TESTSUITE)
 # For this target I added 'rm atconfig' because distcheck was complaining
 # about atconfig being left in the build directory. jhrg
 clean-local:
-        test ! -f '$(TESTSUITE)' || $(SHELL) '$(TESTSUITE)' --clean
+	test ! -f '$(TESTSUITE)' || $(SHELL) '$(TESTSUITE)' --clean
 
 distclean-local:
-        -rm atconfig
+	-rm atconfig
 
 AUTOTEST = $(AUTOM4TE) --language=autotest
 $(TESTSUITE): $(srcdir)/GetDapTest.at $(srcdir)/package.m4
-        $(AUTOTEST) -I '$(srcdir)' -o $@.tmp $@.at
-        mv $@.tmp $@
+	$(AUTOTEST) -I '$(srcdir)' -o $@.tmp $@.at
+	mv $@.tmp $@
 
-# The `:;' works around a Bash 3.2 bug when the output is not writeable.
+# The `:;' works around a Bash 3.2 bug when the output is not writable.
 $(srcdir)/package.m4: $(top_srcdir)/configure.ac
-        :;{ \
-        echo '# Signature of the current package.' && \
-        echo 'm4_define([AT_PACKAGE_NAME],      [@PACKAGE_NAME@])' && \
-        echo 'm4_define([AT_PACKAGE_TARNAME],   [@PACKAGE_TARNAME@])' && \
-        echo 'm4_define([AT_PACKAGE_VERSION],   [@PACKAGE_VERSION@])' && \
-        echo 'm4_define([AT_PACKAGE_STRING],    [@PACKAGE_STRING@])' && \
-        echo 'm4_define([AT_PACKAGE_BUGREPORT], [@PACKAGE_BUGREPORT@])'; \
-        } >'$(srcdir)/package.m4'
+	:;{ \
+	echo '# Signature of the current package.' && \
+	echo 'm4_define([AT_PACKAGE_NAME],      [@PACKAGE_NAME@])' && \
+	echo 'm4_define([AT_PACKAGE_TARNAME],   [@PACKAGE_TARNAME@])' && \
+	echo 'm4_define([AT_PACKAGE_VERSION],   [@PACKAGE_VERSION@])' && \
+	echo 'm4_define([AT_PACKAGE_STRING],    [@PACKAGE_STRING@])' && \
+	echo 'm4_define([AT_PACKAGE_BUGREPORT], [@PACKAGE_BUGREPORT@])'; \
+	} >'$(srcdir)/package.m4'
+
 
 
 
