@@ -1,8 +1,8 @@
 
 AUTOM4TE = autom4te
 
-EXTRA_DIST = GetDapTest.at $(TESTSUITE) atlocal.in $(srcdir)/package.m4 das-testsuite dds-testsuite expr-testsuite
-TESTSUITE = $(srcdir)/GetDapTest
+EXTRA_DIST = DASTest.at DDSTest.at EXPRTest.at $(TESTSUITE) atlocal.in $(srcdir)/package.m4 das-testsuite dds-testsuite expr-testsuite
+TESTSUITE = $(srcdir)/DASTest $(srcdir)/DDSTest $(srcdir)/EXPRTest
 
 check-local: atconfig atlocal $(TESTSUITE)
 	$(SHELL) '$(TESTSUITE)' $(TESTSUITEFLAGS)
@@ -23,7 +23,7 @@ distclean-local:
 	-rm atconfig
 
 AUTOTEST = $(AUTOM4TE) --language=autotest
-$(TESTSUITE): $(srcdir)/GetDapTest.at $(srcdir)/package.m4
+$(TESTSUITE): $(srcdir)/DASTest.at $(srcdir)/DDSTest.at $(srcdir)/EXPRTest.at $(srcdir)/package.m4
 	$(AUTOTEST) -I '$(srcdir)' -o $@.tmp $@.at
 	mv $@.tmp $@
 
