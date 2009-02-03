@@ -1,0 +1,63 @@
+# Process with autom4te to create an -*- Autotest -*- test suite.
+
+
+# ------------------------------
+#
+
+AT_INIT([expr-test])
+# AT_COPYRIGHT([])
+
+# AT_TESTED([expr-test])
+
+# Usage: _AT_TEST_*(<expr source>, <baseline file>)
+
+m4_define([_AT_DODS_TEST],   
+[AT_BANNER([Test $1 $2])
+AT_SETUP([DODS $1])
+AT_KEYWORDS([expr])
+AT_CHECK([$srcdir/expr-test -p < $1], [], [stdout], [ignore])
+AT_CHECK([diff -b -B $2 stdout], [], [ignore],[],[])
+AT_CLEANUP])
+
+m4_define([AT_DODS_RESPONSE_TEST],
+[AT_BANNER([EXPR response for $1.])
+_AT_DAS_TEST([$srcdir/expr-testsuite/$1], [$srcdir/expr-testsuite/$1.base])
+])
+
+AT_DODS_RESPONSE_TEST([data.61a])
+AT_DODS_RESPONSE_TEST([data.61b])
+AT_DODS_RESPONSE_TEST([data.61c])
+AT_DODS_RESPONSE_TEST([data.61d])
+AT_DODS_RESPONSE_TEST([data.z0])
+AT_DODS_RESPONSE_TEST([data.z1])
+AT_DODS_RESPONSE_TEST([data.z2])
+AT_DODS_RESPONSE_TEST([data.z3])
+AT_DODS_RESPONSE_TEST([data.z4])
+AT_DODS_RESPONSE_TEST([data.z5])
+AT_DODS_RESPONSE_TEST([data.z6])
+AT_DODS_RESPONSE_TEST([data.z7])
+AT_DODS_RESPONSE_TEST([data.zz0])
+AT_DODS_RESPONSE_TEST([data.zz1])
+AT_DODS_RESPONSE_TEST([data.zz2])
+AT_DODS_RESPONSE_TEST([test.1])
+AT_DODS_RESPONSE_TEST([test.2])
+AT_DODS_RESPONSE_TEST([test.2a])
+AT_DODS_RESPONSE_TEST([test.3])
+AT_DODS_RESPONSE_TEST([test.4])
+AT_DODS_RESPONSE_TEST([test.5])
+AT_DODS_RESPONSE_TEST([test.6])
+AT_DODS_RESPONSE_TEST([test.61])
+AT_DODS_RESPONSE_TEST([test.7])
+AT_DODS_RESPONSE_TEST([test.8])
+AT_DODS_RESPONSE_TEST([test.9])
+AT_DODS_RESPONSE_TEST([test.a])
+AT_DODS_RESPONSE_TEST([test.b])
+AT_DODS_RESPONSE_TEST([test.c0])
+AT_DODS_RESPONSE_TEST([test.c1])
+AT_DODS_RESPONSE_TEST([test.c2])
+AT_DODS_RESPONSE_TEST([test.c3])
+AT_DODS_RESPONSE_TEST([test.c4])
+AT_DODS_RESPONSE_TEST([test.cc0])
+AT_DODS_RESPONSE_TEST([test.cc1])
+AT_DODS_RESPONSE_TEST([test.d])
+
