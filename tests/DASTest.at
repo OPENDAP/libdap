@@ -15,8 +15,12 @@ m4_define([_AT_DAS_TEST],
 [AT_BANNER([Test $1 $2])
 AT_SETUP([DAS $1])
 AT_KEYWORDS([das])
-AT_CHECK([$srcdir/das-test -p < $1], [], [stdout], [ignore])
-AT_CHECK([diff -b -B $2 stdout], [], [ignore],[],[])
+#Added || true because the $srcdir/das-test -p < $1 needs to be true whether the
+#output is printed to stdout or stderr
+AT_CHECK([$srcdir/das-test -p < $1 || true], [], [stdout], [stderr])
+#Need to compare either stdout or stderr because of the directory the above
+#AT_CHECK prints output to
+AT_CHECK([diff -b -B $2 stdout || diff -b -B $2 stderr], [], [ignore],[],[])
 AT_CLEANUP])
 
 m4_define([AT_DAS_RESPONSE_TEST],
