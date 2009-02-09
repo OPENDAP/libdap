@@ -3,6 +3,5 @@ Dataset {
     Int32 i[20];
     String s;
     Int32 j;
-    List Int32 l;
 } test1;
 The data:
