@@ -1,0 +1,52 @@
+Build the library and cd to tests; then 'make expr-test'.
+
+Here are some sample uses of the ugrid_demo fintion:
+
+This tests the basic erro handling since test.1's 'i' variable is not an array.
+
+wasabi:tests jimg$ ./expr-test -w expr-testsuite/test.1 -k "ugrid_demo()"
+The complete DDS:
+Dataset {
+    Int32 i;
+    Int32 j;
+} test1;
+The data:
+String info = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\\012<function name=\"ugrid_demo\" version=\"0.1\">\\012Fledgling code for Unstructured grid operations.\\012</function>";
+
+Here's the info rsponse. The 'test.3' argument is not used but the
+test driver exects it.
+
+wasabi:tests jimg$ ./expr-test -w expr-testsuite/test.3 -k "ugrid_demo()"
+The complete DDS:
+Dataset {
+    Int32 i[20];
+    Int32 j;
+} test1;
+The data:
+String info = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\\012<function name=\"ugrid_demo\" version=\"0.1\">\\012Fledgling code for Unstructured grid operations.\\012</function>";
+
+Here's lookat the tes driver and the data values without modifiction:
+
+wasabi:tests jimg$ ./expr-test -w expr-testsuite/test.3 -k "i"
+The complete DDS:
+Dataset {
+    Int32 i[20];
+    Int32 j;
+} test1;
+The data:
+Int32 i[20] = {123456789, 123456789, 123456789, 123456789, 123456789, 123456789, 123456789, 123456789, 123456789, 123456789, 123456789, 123456789, 123456789, 123456789, 123456789, 123456789, 123456789, 123456789, 123456789, 123456789};
+wasabi:tests jimg$ 
+
+And here's what the function does to the values. Note that they are bigger by a factorof ten and the type has been changed from Int32 to Float64.
+
+./expr-test -w expr-testsuite/test.3 -k "ugrid_demo(i)"
+The complete DDS:
+Dataset {
+    Int32 i[20];
+    Int32 j;
+} test1;
+The data:
+Float64 i_scaled[20] = {1234567890, 1234567890, 1234567890, 1234567890, 1234567890, 1234567890, 1234567890, 1234567890, 1234567890, 1234567890, 1234567890, 1234567890, 1234567890, 1234567890, 1234567890, 1234567890, 1234567890, 1234567890, 1234567890, 1234567890};
+
+
+

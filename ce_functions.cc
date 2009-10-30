@@ -64,11 +64,6 @@ static char rcsid[]not_used =
 #include "Structure.h"
 #include "Sequence.h"
 #include "Grid.h"
-#if 0
-#include "Array.h"
-#include "Sequence.h"
-#include "Grid.h"
-#endif
 #include "Error.h"
 #include "RValue.h"
 
@@ -106,10 +101,13 @@ namespace libdap {
 /** Is \e lhs equal to \e rhs? Use epsilon to determine equality. */
 inline bool double_eq(double lhs, double rhs, double epsilon = 1.0e-5)
 {
+    return fabs(lhs - rhs) < epsilon;
+#if 0
     if (lhs > rhs)
         return (lhs - rhs) < ((lhs + rhs) / epsilon);
     else
         return (rhs - lhs) < ((lhs + rhs) / epsilon);
+#endif
 }
 
 /** Given a BaseType pointer, extract the string value it contains and return
@@ -135,6 +133,7 @@ string extract_string_argument(BaseType * arg)
 
     return s;
 }
+
 template<class T> static void set_array_using_double_helper(Array * a,
         double *src, int src_len)
 {
@@ -158,8 +157,10 @@ template<class T> static void set_array_using_double_helper(Array * a,
  source (\e src) array is different than the destination (\e dest) the
  caller has made a mistake. In that case it will throw an Error object.
 
- After setting that values, this method sets the \c read_p property for
- \e dest.
+ After setting the values, this method sets the \c read_p property for
+ \e dest. Setting \e read_p tells the serialization methods in libdap
+ that this variable already holds data values and, given that, the
+ serialization code will not try to read the values.
 
  @param dest An Array. The values are written to this array, reusing
  its storage. Existing values are lost.
@@ -337,6 +338,7 @@ function_version(int, BaseType *[], DDS &, BaseType **btpp)
                        <function name=\"geogrid\" version=\"1.0b2\"/>\
                        <function name=\"geoarray\" version=\"0.9b1\"/>\
                        <function name=\"linear_scale\" version=\"1.0b1\"/>\
+                       <function name=\"ugrid_demo\" version=\"0.1\"/>\
                        </functions>";
 
     Str *response = new Str("version");
@@ -1064,8 +1066,148 @@ function_geoarray(int argc, BaseType * argv[], DDS &, BaseType **btpp)
     throw InternalErr(__FILE__, __LINE__, "Impossible condition in geoarray.");
 }
 
+/** This is a stub Constraint Expression (i.e., server-side) function
+    that will evolve into an interface for Unstructured Grid
+    operations. 
+
+    The function takes a single variable that should be a one
+    dimensional array variable and scales it by a factor of ten. The 
+    result is returned as the value of the CE expression.
+
+    @param argc Count of the function's arguments
+    @param argv Array of pointers to the functions arguments
+    @param dds Reference to the DDS object for the complete dataset.
+    This holds pointers to all of the variables and attributes in the
+    dataset. 
+    @param btpp Return the function result in an instance of BaseType
+    referenced by this pointer to a pointer. We could have used a
+    BaseType reference, instead of pointer to a pointer, but we didn't.
+    This is a value-result parameter.
+
+    @return void
+
+    @exception Error Thrown If the Array is not a one dimensional
+    array. */
+void
+function_ugrid_demo(int argc, BaseType * argv[], DDS &dds, BaseType **btpp)
+{
+    // This is the nascent on-line help for these functions. 
+    static string info =
+	string("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n") +
+	"<function name=\"ugrid_demo\" version=\"0.1\">\n" +
+	"Fledgling code for Unstructured grid operations.\n" +
+	"</function>";
+
+    // This makes a new libdap string variable (instance of Str) and
+    // stuffs the 'info' string in it. Calling UGrid() with no
+    // argument will thus return the info string. 
+    if (argc == 0) {
+        Str *response = new Str("info");
+        response->set_value(info);
+        *btpp = response;
+        return;
+    }
+
+    // Check number of arguments; DBG is a macro. Use #define
+    // DODS_DEBUG to activate the debugging stuff.
+    DBG(cerr << "argc = " << argc << endl);
+    if (argc != 1)
+        throw Error(malformed_expr,"Wrong number of arguments to linear_scale(). See linear_scale() for more information");
+
+    // We could have read this in using a second parameter...
+    const int scale_factor = 10;
+
+    // Read the data, scale and return the result. 
+
+    BaseType *dest = 0;		// This will hold the result
+    double *data;		// And this will hold the actual
+				// values
+    // There are two cases we need to be aware of: If the 'array' is
+    // really what libdap calls a Grid, we need to know that users
+    // generally supply just the Grid name and mean 'the Array part of
+    // the Grid' 
+    switch (argv[0]->type()) {
+      case dods_array_c: {
+	  // Get a libdap::Array object from the function's first argument
+	  Array &source = dynamic_cast<Array&>(*argv[0]);
+	  // Calling set_send_p() for the libdap Array tells the library
+	  // that this variable has data that is in the 'projection';
+	  // that is should be read from the data set using the data
+	  // handler's read() method. The read() method is declared in
+	  // BaseType and specialized by each handler. The netCDF
+	  // handler uses the nerCDF library to read data, the HDF4
+	  // handler uses the HDF4 library, ... You get the picture.
+	  source.set_send_p(true);
+	  // ... and read the data.
+	  // NB: This is a work-around for a bug in the HDF4 handler: If
+	  // the array is really a map within a Grid, make sure to read
+	  // using the Grid because of the HDF4 handler's odd behavior
+	  // WRT dimensions. Normally you'd just call a BaseType's
+	  // read() method to get data. If you only want some of the
+	  // data from an array, for example, then set a start,stop,stride
+	  // constraints on the dimensions.
+	  if (source.get_parent() && source.get_parent()->type() == dods_grid_c)
+	      source.get_parent()->read();
+	  else
+	      source.read();
+
+	  // Now the data values are stuck in the libdap Array variable
+	  // 'source'. Extract those values in to a plain C array of
+	  // doubles. The 'extract_double_array()' function is one of
+	  // the utility functions defined in this source file.
+	  data = extract_double_array(&source);
+
+	  // How many elements are in 'source'? If source is a M x N
+	  // array length() returns m*n, and so on. Array data is stored
+	  // in row major order by libdap.
+	  int length = source.length();
+	  int i = 0;
+	  // I felt compelled to do something to the data...
+	  while (i < length) {
+	      data[i++] *= scale_factor;
+	  }
+
+	  // OK, here's a trick: A libdap Array is a child of
+	  // libdap::Vector and libdap::Vector holds an instance of
+	  // libdap::BaseType that is a template for the type of the
+	  // Vector's elements. So to make an Array of Float64 values,
+	  // make a new instance of the _scalar_ Float64 type (and give
+	  // it a meaningful name) and then add it to the libdap::Array
+	  // variable as the template. Confusingly, the method to do
+	  // that is called 'add_var' and not add_template. Note that
+	  // add_var deletes the old template instance, so now 'source'
+	  // is an array of Float64's no matter what it was before.
+	  Float64 *temp_f = new Float64(source.name() + "_scaled");
+	  source.add_var(temp_f);
+
+	  // Now copy values to the variable. set_value() is safer but I
+	  // had problems with it at some point. 
+#ifdef VAL2BUF
+	  source.val2buf(static_cast<void*>(data), false);
+#else
+	  source.set_value(data, length);
+#endif
+	  // Copies in libdap are all deep copies; callers always free
+	  // memory they allocate.
+	  delete [] data;
+	  delete temp_f;
+
+	
+	  dest = new Array(source); // argv[0];
+	  break;
+      } 
+
+      default:
+        throw Error(malformed_expr,"The ugrid_demo() function works only for numeric Grids and Arrays.");
+    }
+
+    *btpp = dest;
+    return;
+}
+
 void register_functions(ConstraintEvaluator & ce)
 {
+    ce.add_function("ugrid_demo", function_ugrid_demo);
     ce.add_function("grid", function_grid);
     ce.add_function("geogrid", function_geogrid);
     ce.add_function("linear_scale", function_linear_scale);
