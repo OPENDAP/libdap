@@ -40,15 +40,20 @@ static char rcsid[]not_used =
 };
 
 #include <limits.h>
-
 #include <cstdlib>      // used by strtod()
 #include <cerrno>
 #include <cmath>
 #include <iostream>
+#include <sstream>
+#include <fstream>
 #include <vector>
 #include <algorithm>
 
-// #define DODS_DEBUG
+// billhowe: I couldn't get DODS_DEBUG to work
+//#define DODS_DEBUG
+
+#define DBGSTREAM cout
+//#define DBGSTREAM nullstream()
 
 #include "BaseType.h"
 #include "Byte.h"
@@ -76,6 +81,15 @@ static char rcsid[]not_used =
 #include "gse.tab.hh"
 #include "debug.h"
 #include "util.h"
+
+#include "gridfields/restrict.h"
+#include "gridfields/gridfield.h"
+#include "gridfields/grid.h"
+#include "gridfields/cell.h"
+#include "gridfields/cellarray.h"
+#include "gridfields/array.h"
+#include "gridfields/implicit0cells.h"
+#include "gridfields/gridfieldoperator.h"
 
 //  We wrapped VC++ 6.x strtod() to account for a short coming
 //  in that function in regards to "NaN".  I don't know if this
@@ -222,6 +236,161 @@ void set_array_using_double(Array * dest, double *src, int src_len)
     // Set the read_p property.
     dest->set_read_p(true);
 }
+
+template<typename DODS, typename T> T *extract_array_helper(Array *a) 
+{
+  DBGSTREAM << "Extracting array values..." << endl;
+  int length = a->length();
+
+  DBGSTREAM << "Allocating..." << length << endl;
+  DODS *b = new DODS[length];
+  DBGSTREAM << "Assigning value..." << endl;
+  a->value(b);
+  DBGSTREAM << "array values extracted.  Casting..." << endl;
+  T *dest = new T[length];
+  for (int i = 0; i < length; ++i)
+    dest[i] = (T) b[i];
+  delete[]b;
+  DBGSTREAM << "Returning extracted values." << endl;
+
+  return dest;
+}
+
+GF::Array *extract_gridfield_array(Array *a) {
+    if ((a->type() == dods_array_c && !a->var()->is_simple_type())
+  || a->var()->type() == dods_str_c || a->var()->type() == dods_url_c)
+        throw Error(malformed_expr,
+                "The function requires a DAP numeric-type array argument.");
+
+    a->set_send_p(true);
+    a->read();
+
+    // Construct a GridField array from a DODS array
+    GF::Array *gfa;
+
+    switch (a->var()->type()) {
+    case dods_byte_c:
+       gfa = new GF::Array(a->var()->name(), GF::INT);
+       gfa->shareIntData(extract_array_helper<dods_byte, int>(a), a->length());
+       break;
+    case dods_uint16_c:
+       gfa = new GF::Array(a->var()->name(), GF::INT);
+       gfa->shareIntData(extract_array_helper<dods_uint16, int>(a), a->length());
+       break;
+    case dods_int16_c:
+       gfa = new GF::Array(a->var()->name(), GF::INT);
+       gfa->shareIntData(extract_array_helper<dods_int16, int>(a), a->length());
+       break;
+    case dods_uint32_c:
+       gfa = new GF::Array(a->var()->name(), GF::INT);
+       gfa->shareIntData(extract_array_helper<dods_uint32, int>(a), a->length());
+       break;
+    case dods_int32_c:
+       gfa = new GF::Array(a->var()->name(), GF::INT);
+       gfa->shareIntData(extract_array_helper<dods_int32, int>(a), a->length());
+       break;
+    case dods_float32_c:
+       gfa = new GF::Array(a->var()->name(), GF::FLOAT);
+       gfa->shareFloatData(extract_array_helper<dods_float32, float>(a), a->length());
+       break;
+    case dods_float64_c:
+       gfa = new GF::Array(a->var()->name(), GF::FLOAT);
+       gfa->shareFloatData(extract_array_helper<dods_float64, float>(a), a->length());
+       break;
+    default:
+        throw InternalErr(__FILE__, __LINE__,
+                "Unknown DDS type encountered when converting to gridfields array");
+    }
+    return gfa;
+};
+
+/*
+If the array has the exact dimensions in the vector dims, in the same order, 
+return true.  Otherwise return false. 
+
+*/
+bool same_dimensions(Array *arr, vector<Array::dimension> &dims) {
+  vector<Array::dimension>::iterator dit;
+  Array::Dim_iter ait;
+  DBGSTREAM << "same_dimensions test for array " << arr->name() << endl;
+  DBGSTREAM << "  array dims: ";
+  for (ait = arr->dim_begin(); ait!=arr->dim_end(); ++ait) {
+    DBGSTREAM << (*ait).name << ", ";
+  }
+  DBGSTREAM << endl;
+  DBGSTREAM << "  rank dims: ";
+  for (dit = dims.begin(); dit!=dims.end(); ++dit) {
+    DBGSTREAM << (*dit).name << ", " << endl;
+    for (ait = arr->dim_begin(); ait!=arr->dim_end(); ++ait) {
+      Array::dimension dd = *dit;
+      Array::dimension ad = *ait;
+      if (dd.name != ad.name 
+       or dd.size != ad.size 
+       or dd.stride != ad.stride
+       or dd.stop != ad.stop) 
+       return false;
+    }
+    DBGSTREAM << endl;
+  }
+  return true;
+}
+
+/** Given a pointer to an Array which holds a numeric type, extract the
+ values and return in an array of T. This function allocates the
+ array using 'new T[n]' so delete[] can be used when you are done
+ the data. */
+template<typename T>
+T *extract_array(Array * a)
+{
+    // Simple types are Byte, ..., Float64, String and Url.
+    if ((a->type() == dods_array_c && !a->var()->is_simple_type())
+  || a->var()->type() == dods_str_c || a->var()->type() == dods_url_c)
+        throw Error(malformed_expr,
+                "The function requires a DAP numeric-type array argument.");
+
+    a->set_send_p(true);
+    a->read();
+    // This test should never pass due to the previous two lines; 
+    // reading here seems to make 
+    // sense rather than letting the caller forget to do so.
+    // is read() idemopotent?
+    if (!a->read_p())
+        throw InternalErr(__FILE__, __LINE__,
+                string("The Array '") + a->name() +
+                "'does not contain values. send_read_p() not called?");
+
+    // The types of arguments that the CE Parser will build for numeric
+    // constants are limited to Uint32, Int32 and Float64. See ce_expr.y.
+    // Expanded to work for any numeric type so it can be used for more than
+    // just arguments.
+    switch (a->var()->type()) {
+    case dods_byte_c:
+        return extract_array_helper<dods_byte, T>(a);
+    case dods_uint16_c:
+        DBGSTREAM << "dods_uint32_c" << endl;
+        return extract_array_helper<dods_uint16, T>(a);
+    case dods_int16_c:
+        DBGSTREAM << "dods_int16_c" << endl;
+        return extract_array_helper<dods_int16, T>(a);
+    case dods_uint32_c:
+        DBGSTREAM << "dods_uint32_c" << endl;
+        return extract_array_helper<dods_uint32, T>(a);
+    case dods_int32_c:
+        DBGSTREAM << "dods_int32_c" << endl;
+        return extract_array_helper<dods_int32, T>(a);
+    case dods_float32_c:
+        DBGSTREAM << "dods_float32_c" << endl;
+        return extract_array_helper<dods_float32, T>(a);
+    case dods_float64_c:
+        DBGSTREAM << "dods_float64_c" << endl;
+        return extract_array_helper<dods_float64, T>(a);
+    default:
+        throw InternalErr(__FILE__, __LINE__,
+                "The argument list built by the CE parser contained an unsupported numeric type.");
+    }
+}
+
+
 
 template<class T> static double *extract_double_array_helper(Array * a)
 {
@@ -1066,6 +1235,8 @@ function_geoarray(int argc, BaseType * argv[], DDS &, BaseType **btpp)
     throw InternalErr(__FILE__, __LINE__, "Impossible condition in geoarray.");
 }
 
+
+
 /** This is a stub Constraint Expression (i.e., server-side) function
     that will evolve into an interface for Unstructured Grid
     operations. 
@@ -1091,117 +1262,210 @@ function_geoarray(int argc, BaseType * argv[], DDS &, BaseType **btpp)
 void
 function_ugrid_demo(int argc, BaseType * argv[], DDS &dds, BaseType **btpp)
 {
+
     // This is the nascent on-line help for these functions. 
     static string info =
 	string("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n") +
 	"<function name=\"ugrid_demo\" version=\"0.1\">\n" +
 	"Fledgling code for Unstructured grid operations.\n" +
 	"</function>";
-
-    // This makes a new libdap string variable (instance of Str) and
-    // stuffs the 'info' string in it. Calling UGrid() with no
-    // argument will thus return the info string. 
-    if (argc == 0) {
-        Str *response = new Str("info");
-        response->set_value(info);
-        *btpp = response;
-        return;
-    }
-
+    
     // Check number of arguments; DBG is a macro. Use #define
     // DODS_DEBUG to activate the debugging stuff.
-    DBG(cerr << "argc = " << argc << endl);
-    if (argc != 1)
-        throw Error(malformed_expr,"Wrong number of arguments to linear_scale(). See linear_scale() for more information");
+    if (argc != 2)
+        throw Error(malformed_expr,"Wrong number of arguments to ugrid_demo. ugrid_demo(dim:int32, condition:string");
 
-    // We could have read this in using a second parameter...
-    const int scale_factor = 10;
-
-    // Read the data, scale and return the result. 
-
-    BaseType *dest = 0;		// This will hold the result
-    double *data;		// And this will hold the actual
-				// values
-    // There are two cases we need to be aware of: If the 'array' is
-    // really what libdap calls a Grid, we need to know that users
-    // generally supply just the Grid name and mean 'the Array part of
-    // the Grid' 
-    switch (argv[0]->type()) {
-      case dods_array_c: {
-	  // Get a libdap::Array object from the function's first argument
-	  Array &source = dynamic_cast<Array&>(*argv[0]);
-	  // Calling set_send_p() for the libdap Array tells the library
-	  // that this variable has data that is in the 'projection';
-	  // that is should be read from the data set using the data
-	  // handler's read() method. The read() method is declared in
-	  // BaseType and specialized by each handler. The netCDF
-	  // handler uses the nerCDF library to read data, the HDF4
-	  // handler uses the HDF4 library, ... You get the picture.
-	  source.set_send_p(true);
-	  // ... and read the data.
-	  // NB: This is a work-around for a bug in the HDF4 handler: If
-	  // the array is really a map within a Grid, make sure to read
-	  // using the Grid because of the HDF4 handler's odd behavior
-	  // WRT dimensions. Normally you'd just call a BaseType's
-	  // read() method to get data. If you only want some of the
-	  // data from an array, for example, then set a start,stop,stride
-	  // constraints on the dimensions.
-	  if (source.get_parent() && source.get_parent()->type() == dods_grid_c)
-	      source.get_parent()->read();
-	  else
-	      source.read();
-
-	  // Now the data values are stuck in the libdap Array variable
-	  // 'source'. Extract those values in to a plain C array of
-	  // doubles. The 'extract_double_array()' function is one of
-	  // the utility functions defined in this source file.
-	  data = extract_double_array(&source);
-
-	  // How many elements are in 'source'? If source is a M x N
-	  // array length() returns m*n, and so on. Array data is stored
-	  // in row major order by libdap.
-	  int length = source.length();
-	  int i = 0;
-	  // I felt compelled to do something to the data...
-	  while (i < length) {
-	      data[i++] *= scale_factor;
-	  }
-
-	  // OK, here's a trick: A libdap Array is a child of
-	  // libdap::Vector and libdap::Vector holds an instance of
-	  // libdap::BaseType that is a template for the type of the
-	  // Vector's elements. So to make an Array of Float64 values,
-	  // make a new instance of the _scalar_ Float64 type (and give
-	  // it a meaningful name) and then add it to the libdap::Array
-	  // variable as the template. Confusingly, the method to do
-	  // that is called 'add_var' and not add_template. Note that
-	  // add_var deletes the old template instance, so now 'source'
-	  // is an array of Float64's no matter what it was before.
-	  Float64 *temp_f = new Float64(source.name() + "_scaled");
-	  source.add_var(temp_f);
-
-	  // Now copy values to the variable. set_value() is safer but I
-	  // had problems with it at some point. 
-#ifdef VAL2BUF
-	  source.val2buf(static_cast<void*>(data), false);
-#else
-	  source.set_value(data, length);
-#endif
-	  // Copies in libdap are all deep copies; callers always free
-	  // memory they allocate.
-	  delete [] data;
-	  delete temp_f;
-
-	
-	  dest = new Array(source); // argv[0];
-	  break;
-      } 
-
-      default:
-        throw Error(malformed_expr,"The ugrid_demo() function works only for numeric Grids and Arrays.");
+    if (argv[0]->type() != dods_int32_c) {
+        throw Error(malformed_expr,"Wrong type for second argument. ugrid_demo(dim:int32, condition:string");
+    }
+    if (argv[1]->type() != dods_str_c) {
+        throw Error(malformed_expr,"Wrong type for first argument. ugrid_demo(dim:int32, condition:string");
     }
 
-    *btpp = dest;
+    BaseType *result = 0;		// This will hold the result
+    
+    // keep track of which DDS dimensions correspond to GF dimensions
+    map<GF::Dim_t, vector<Array::dimension> > rank_dimensions; 
+
+    GF::Grid *G = new GF::Grid("result");
+  
+    // 1) Find the nodes
+    DBGSTREAM << "Reading 0-cells" << endl;
+    GF::AbstractCellArray *nodes = NULL;
+    for (DDS::Vars_iter vi = dds.var_begin(); vi != dds.var_end(); vi++) {
+      BaseType *bt = *vi;
+      Array &arr = dynamic_cast<Array&>(*bt);
+      AttrTable &at = arr.get_attr_table();
+      DBGSTREAM << "Array: " << arr.name() << endl;
+
+      int node_count = -1;  //error condition
+      AttrTable::Attr_iter loc = at.simple_find("grid_location");
+      if (loc != at.attr_end()) {
+        if (at.get_attr(loc, 0) == "node") {
+          node_count = 1; 
+          Array::Dim_iter di = arr.dim_begin();
+          DBGSTREAM << "Interpreting 0-cells from dimensions: ";
+          rank_dimensions[0] = vector<Array::dimension>();
+          for (Array::Dim_iter di = arr.dim_begin(); di!= arr.dim_end(); di++) {
+            // These dimensions define the nodes.
+            DBGSTREAM << di->name << ", ";
+            rank_dimensions[0].push_back(*di);
+            node_count *= di->c_size;
+          }
+          DBGSTREAM << endl;
+        } // Bound to nodes?  
+      } // Has a "grid_location" attribute?
+      /* 
+We should use implicit0cells here, but that's limited to 
+cell ids that are numbered from zero.  The class can 
+and should be generalized, but I don't want to get 
+distracted fixing it.  
+Instead, we materialize the nodes as explciit cells.  Wastes memory.
+
+Update: We do use implicit0cells, noting that the index_origin attribute
+is currently only defined for k-cells, where k>0.
+For now, we do NOT preserve index_origin the result.
+We can therefore guarantee that nodes are numbered from 0.
+       */  
+      nodes = new GF::Implicit0Cells(node_count);
+/*
+
+      nodes = new GF::CellArray();
+      for (int i=index_origin; i<node_count; i++) {
+        // insert a cell of one node with id i
+        nodes->addCellNodes(&i, 1);
+      }
+*/    
+
+      // We've figured out which dimensions are associated with
+      // the nodes, so stop 
+      // TODO: Assumes only one grid per file!
+      break; 
+    }
+
+    // Attach the nodes to the grid
+    G->setKCells(nodes, 0);
+
+    // 2) For each k, find the k-cells
+    // k = 2, for now
+    DBGSTREAM << "Reading 2-cells" << endl;
+    GF::CellArray *twocells = NULL;
+    for (DDS::Vars_iter vi = dds.var_begin(); vi != dds.var_end(); vi++) {
+      BaseType *bt = *vi;
+      Array &arr = dynamic_cast<Array&>(*bt);
+      DBGSTREAM << "Array: " << arr.name() << endl;
+      AttrTable &at = arr.get_attr_table();
+
+      AttrTable::Attr_iter iter_cell_type = at.simple_find("cell_type");
+
+      if (iter_cell_type != at.attr_end()) {        
+        string cell_type = at.get_attr(iter_cell_type, 0);
+        DBGSTREAM << cell_type << endl;
+        if (cell_type == "tri_ccw") {
+          // Ok, we expect triangles
+          // which means a shape of 3xN
+          int twocell_count = -1, i=0;
+          int total_size = 1;
+          rank_dimensions[2] = vector<Array::dimension>();
+          for (Array::Dim_iter di = arr.dim_begin(); di!= arr.dim_end(); di++) {
+            total_size *= di->c_size;
+            rank_dimensions[2].push_back(*di);
+            if (i == 0) {
+              if (di->c_size != 3) {
+                DBGSTREAM << "Cell array of type 'tri_ccw' must have a shape of 3xN, since triangles have three nodes." << endl;
+                throw Error(malformed_expr,"Cell array of type 'tri_ccw' must have a shape of 3xN, since triangles have three nodes.");
+              }
+            }
+            if (i == 1) {
+              twocell_count = di->c_size;
+            }
+            if (i>1) {
+              DBGSTREAM << "Too many dimensions for a cell array of type 'tri_ccw'.  Expected shape of 3XN" << endl;
+              throw Error(malformed_expr,"Too many dimensions for a cell array of type 'tri_ccw'.  Expected shape of 3XN");
+            }
+            i++;
+          }
+
+          // interpret the array data as triangles
+          GF::Node *cellids = extract_array<GF::Node>(&arr);
+         
+          // adjust for index origin
+          AttrTable::Attr_iter iter_index_origin = at.simple_find("index_origin");
+          if (iter_index_origin != at.attr_end()) {
+            DBGSTREAM << "Found an index origin attribute." << endl;
+            AttrTable::entry *index_origin_entry = *iter_index_origin;
+            int index_origin;
+            if (index_origin_entry->attr->size() == 1) {
+              AttrTable::entry *index_origin_entry = *iter_index_origin;
+              string val = (*index_origin_entry->attr)[0];
+              DBGSTREAM << "Value: " << val << endl;
+              stringstream buffer(val);
+              // what happens if string cannot be converted to an integer?
+              buffer >> index_origin;
+              DBGSTREAM << "converted: " << index_origin << endl;
+              if (index_origin != 0) {
+                for (int j=0; j<total_size; j++) {
+                  cellids[j] -= index_origin;
+                }
+              }
+            } else {
+              throw Error(malformed_expr,"Index origin attribute exists, but either no value supplied, or more than one value supplied.");
+            }
+          }
+
+          // Create the cell array
+          twocells = new GF::CellArray(cellids, twocell_count, 3);
+          // Attach it to the grid
+          G->setKCells(twocells, 2);
+        }
+      }
+
+    }
+ 
+    // 3) For each var, bind it to the appropriate dimension
+
+    // For each variable in the data source:
+    GF::GridField *input = new GF::GridField(G);
+    for (DDS::Vars_iter vi = dds.var_begin(); vi != dds.var_end(); vi++) {
+      BaseType *bt = *vi;
+      if (bt->type() == dods_array_c) {
+        Array *arr = (Array *)bt;
+        DBGSTREAM << "Data Array: " << arr->name() << endl;
+        // Each rank is associated with a sequence of dimensions
+        // Vars that have the same dimensions should be bound to the grid at that rank
+        // (Note that in gridfields, Dimension and rank are synonyms.  We
+        // use the latter here to avoid confusion).
+        map<GF::Dim_t, vector<Array::dimension> >::iterator iter;
+        for( iter = rank_dimensions.begin(); iter != rank_dimensions.end(); ++iter ) {
+          bool same = same_dimensions(arr, iter->second);
+          if (same) {
+            // This var should be bound to rank k
+            GF::Array *gfa = extract_gridfield_array(arr);
+            DBGSTREAM << "Adding Attribute: " << gfa->sname() << endl;
+            input->AddAttribute(iter->first, gfa);
+          } else {
+            //This array does not appear to be associated with any rank of the unstructured grid.  Ignore for now.  Anything else we should do?
+          }
+        }
+      } // Ignore if not an array type.  Anything else we should do?
+    }
+    input->print();
+/*
+    input->print();
+    GF::GridFieldOperator *op = GF::RestrictOp(expr, dim, input);
+    GF::GridField *R = op->getResult(); 
+        
+    R->print();
+*/
+
+    // 4) Convert back to a DDS BaseType
+
+    /*
+    // Create variables for each cell dimension
+    // Create variables for each attribute at each rank
+    */
+
+    *btpp = result;
     return;
 }
 

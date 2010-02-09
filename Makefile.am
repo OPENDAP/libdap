@@ -8,7 +8,6 @@ pkgconfigdir=$(libdir)/pkgconfig
 
 # Arrange to build with the backward compatibility mode enabled.
 AM_CPPFLAGS = -I$(top_srcdir)/gl -I$(top_srcdir)/GNU 
-# -I$(top_srcdir)/xstream
 AM_CXXFLAGS = 
 if COMPILER_IS_GCC
 AM_CXXFLAGS += -Wall -W -Wcast-align
@@ -32,14 +31,11 @@ lib_LTLIBRARIES = libdap.la libdapclient.la libdapserver.la
 bin_SCRIPTS = dap-config dap-config-pkgconfig
 
 bin_PROGRAMS = getdap
-# fdiostream_test
-
-# sbin_PROGRAMS = deflate
 
 BUILT_SOURCES = $(GRAM_SRC) dods-datatypes.h xdr-datatypes.h
 
 libdap_la_SOURCES = $(DAP_SRC) $(GNU_SRC) 
-# $(XSTREAM_SRC)
+
 libdapclient_la_SOURCES = $(CLIENT_SRC) 
 libdapserver_la_SOURCES = $(SERVER_SRC)
 
@@ -55,19 +51,11 @@ libdapserver_la_LDFLAGS = -version-info $(SERVERLIB_VERSION)
 libdapserver_la_LIBADD = libdap.la $(UUID_LIBS)
 
 pkginclude_HEADERS = $(DAP_HDR) $(GNU_HDR) $(CLIENT_HDR) $(SERVER_HDR) 
-# $(XSTREAM_HDR) 
-noinst_HEADERS = config_dap.h
-
-# fdiostream_test_SOURCES = GNU/fdiostream_test.cc
+noinst_HEADERS = config_dap.h $(GRIDFIELD_HDR)
 
 getdap_SOURCES = getdap.cc
 getdap_LDADD = libdapclient.la libdap.la libdapserver.la
 getdap_CPPFLAGS = $(AM_CPPFLAGS) $(CURL_CFLAGS)
-
-# deflate_SOURCES = deflate.c
-#deflate_LDADD = $(ZLIB_LIBS)
-#deflate_CPPFLAGS = $(ZLIB_CFLAGS)
-#deflate_LDFLAGS = $(ZLIB_LDFLAGS)
 
 LEX_YACC_EXTRA = das.lex das.y dds.lex dds.y ce_expr.lex ce_expr.y gse.lex \
 	gse.y Error.lex Error.y
@@ -76,8 +64,6 @@ EXTRA_DIST = ChangeLog COPYING README.dodsrc COPYRIGHT_URI	 \
 	COPYRIGHT_W3C GNU/README doxy.conf doxy_private.conf libdap.spec \
 	VCPP dods-datatypes-static.h xdr-datatypes-static.h \
 	dap-config-pkgconfig $(LEX_YACC_EXTRA) $(GRAM_SRC) OSX_Resources
-
-# README.AIS xstream/README 
 
 dist_aclocal_DATA = conf/libdap.m4
 pkgconfig_DATA = libdap.pc libdapclient.pc libdapserver.pc
@@ -214,6 +200,35 @@ GRAM_SRC = lex.das.cc das.tab.cc das.tab.hh \
 	lex.Error.cc Error.tab.cc Error.tab.hh gse.tab.hh gse.tab.cc \
 	lex.gse_.cc
 
+# GFDIR = gridfields/
+GRIDFIELD_SRC = gridfields/apply.cc      gridfields/gridfield.cc \
+gridfields/array.cc      gridfields/gridfieldoperator.cc \
+gridfields/cellarray.cc  gridfields/implicit0cells.cc \
+gridfields/cell.cc       gridfields/rankeddataset.cc \
+gridfields/dataset.cc    gridfields/restrict.cc \
+gridfields/expr.cc       gridfields/tuple.cc \
+gridfields/fparser.cc    gridfields/type.cc \
+gridfields/grid.cc       gridfields/unarynodemap.cc \
+gridfields/gfutil.cc	 gridfields/timing.cc \
+gridfields/sift.cc
+
+GRIDFIELD_HDR = gridfields/abstractcellarray.h  gridfields/implicit0cells.h \
+gridfields/access.h             gridfields/implicitcrossnodemap.h \
+gridfields/apply.h              gridfields/nodemap.h \
+gridfields/array.h              gridfields/normnodemap.h \
+gridfields/binarynodemap.h      gridfields/object.h \
+gridfields/cellarray.h          gridfields/ordmap.h \
+gridfields/cell.h               gridfields/rankeddataset.h \
+gridfields/crossnodemap.h       gridfields/restrict.h \
+gridfields/dataset.h            gridfields/timing.h \
+gridfields/expr.h               gridfields/tuple.h \
+gridfields/gridfield.h          gridfields/type.h \
+gridfields/gridfieldoperator.h  gridfields/unarynodemap.h \
+gridfields/grid.h               gridfields/gfutil.h \
+gridfields/idordmap.h		gridfields/crossordmap.h \
+gridfields/fparser.hh		gridfields/fpconfig.hh \
+gridfields/fptypes.hh		gridfields/sift.h
+
 DAP_SRC = AttrTable.cc DAS.cc DDS.cc DataDDS.cc DDXParserSAX2.cc BaseType.cc \
 	Byte.cc Int32.cc Float64.cc Str.cc Url.cc Vector.cc Array.cc	 \
 	Structure.cc Sequence.cc Grid.cc UInt32.cc Int16.cc UInt16.cc	 \
@@ -224,6 +239,7 @@ DAP_SRC = AttrTable.cc DAS.cc DDS.cc DataDDS.cc DDXParserSAX2.cc BaseType.cc \
 	GeoConstraint.cc GridGeoConstraint.cc \
 	Clause.cc RValue.cc ConstraintEvaluator.cc ArrayGeoConstraint.cc \
 	DapIndent.cc Operators.h					 \
+        $(GRIDFIELD_SRC) \
 	XDRUtils.cc XDRFileMarshaller.cc XDRFileUnMarshaller.cc		 \
 	XDRStreamMarshaller.cc XDRStreamUnMarshaller.cc mime_util.cc 
 
@@ -234,8 +250,6 @@ Operators.h: ce_expr.tab.hh
 
 CLIENT_SRC = RCReader.cc Connect.cc HTTPConnect.cc HTTPCache.cc		\
 	util_mit.cc ResponseTooBigErr.cc HTTPCacheTable.cc fdiostream.cc
-
-# AISResources.cc AISDatabaseParser.cc AISMerge.cc AISConnect.cc 
 
 SERVER_SRC = DODSFilter.cc Ancillary.cc
 

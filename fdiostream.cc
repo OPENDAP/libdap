@@ -28,6 +28,7 @@
 #include "config.h"
 
 #include "fdiostream.h"
+#include "string.h"
 
 //#define DODS_DEBUG
 #include "debug.h"

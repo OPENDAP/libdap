@@ -1,0 +1,77 @@
+namespace DAPCheck {
+/*
+Simple language for checking validity of DAP input for a particular constraintexpression.
+
+Used by gridfields to verify that a DAP dataset represents a validunstructured grid.
+*/
+/*
+
+1) there exists a variable with attribute "grid_location" that has a value
+of "nodes", "edges", "faces"
+
+2) there exists a variable with attribute "cell_type" with value in ...
+
+3) for every variable with an attribute "grid", make sure the value of the attribute refers to a 
+variable that exists.
+
+4) For every variable referred to by a "grid" attribute, make sure that the variable has an attri
+bute "coordinates_node"
+
+5) For every variable with a "grid" attribute, ensure it also has a "grid_location" attribtue.
+
+Has("grid_location")
+Eq("grid_location", "nodes")
+OneOf("grid_location", "nodes, edges, faces")
+
+Exists(Has("grid_location"))
+
+VarExists("foo")
+VarExists(Attribute("grid"))
+
+Variable conditions:
+HasAttr
+HasAttrWithValue
+HasName
+
+*/
+
+class Value {
+
+public:
+  string value;
+}
+
+class Literal : public Value {
+}
+
+class Variable : public Value {
+}
+
+class Condition {
+
+public:
+  Value subject;
+  Value predicate;
+  Value object;
+}
+
+typedef Expr vector<Condition>;
+
+class ForAll {
+  public:
+    Variable var;
+    Expr expr;
+
+  bool eval(Graph facts) {
+    for each trple in facts:
+      for each condition:
+        if condition references var: 
+          instantiate condition with fact 
+          if condition is ground:
+            if condition is false: return false
+            else: continue
+          else:
+            ...
+  }
+}
+

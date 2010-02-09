@@ -44,6 +44,7 @@
 #include "util.h"
 #include "InternalErr.h"
 #include "debug.h"
+#include "string.h"
 
 namespace libdap {
 
