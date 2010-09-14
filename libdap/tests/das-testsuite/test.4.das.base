@@ -1,6 +1,0 @@
-Attributes {
-    a {
-        String b "c";
-        Int32 attributes 4;
-    }
-}

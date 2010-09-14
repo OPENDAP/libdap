@@ -99,12 +99,12 @@ unit_or_name_match(set < string > units, set < string > names,
 
     @note This function assumes that if one of the two values is
     negative, then the notation is or the -180/179 form, otherwise not.
-    If the user asks for 30 degrees to 50 degress (or 50 to 30,
+    If the user asks for 30 degrees to 50 degrees (or 50 to 30,
     for that matter), there's no real way to tell which notation they are
     using.
 
     @param left The left side of the bounding box, in degrees
-    @param right The right side of the boubding box
+    @param right The right side of the bounding box
     @return The notation (pos or neg_pos) */
 GeoConstraint::Notation
 GeoConstraint::categorize_notation(const double left,
@@ -205,8 +205,7 @@ bool GeoConstraint::is_bounding_box_valid(const double left, const double top,
     @param  longitude_index_right Value-result parameter for the right edge
     index. */
 void GeoConstraint::find_longitude_indeces(double left, double right,
-        int &longitude_index_left,
-        int &longitude_index_right) const
+        int &longitude_index_left, int &longitude_index_right) const
 {
     // Use all values 'modulo 360' to take into account the cases where the
     // constraint and/or the longitude vector are given using values greater
@@ -242,7 +241,7 @@ void GeoConstraint::find_longitude_indeces(double left, double right,
 
         // If we cycle completely through all the values/indices, throw
         if (i == lon_origin_index)
-            throw Error("geogrid: Could not find an index for the longitude value '" + long_to_string(left) + "'");
+            throw Error("geogrid: Could not find an index for the longitude value '" + double_to_string(left) + "'");
     }
 
     if (fmod(d_lon[i], 360.0) == t_left)
@@ -260,7 +259,7 @@ void GeoConstraint::find_longitude_indeces(double left, double right,
         // This is like modulus but for 'counting down'
         i = (i == 0) ? d_lon_length - 1 : i - 1;
         if (i == largest_lon_index)
-            throw Error("geogrid: Could not find an index for the longitude value '" + long_to_string(right) + "'");
+            throw Error("geogrid: Could not find an index for the longitude value '" + double_to_string(right) + "'");
     }
 
     if (fmod(d_lon[i], 360.0) == t_right)
@@ -360,7 +359,7 @@ static void transpose(std::vector<std::vector<T> > a,
     }
 }
 
-/** Given a vectorof doubles, transpose the elements. Use this to flip the
+/** Given a vector of doubles, transpose the elements. Use this to flip the
  * latitude vector for a Grid that stores the southern latitudes at the top
  * instead of the bottom.
  *
@@ -644,7 +643,7 @@ void GeoConstraint::set_bounding_box(double top, double left,
                           d_latitude_index_top, d_latitude_index_bottom);
 
 
-    // Find the longitude map indeces that correspond to the bounding box.
+    // Find the longitude map indexes that correspond to the bounding box.
     find_longitude_indeces(left, right, d_longitude_index_left,
                            d_longitude_index_right);
 
