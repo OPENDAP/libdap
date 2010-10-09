@@ -159,17 +159,9 @@ rpm: dist
 # are there so that the values built into dap-config will match the mac
 # osx install dirs and not the temp directory used to build the packages
 
-PACKAGEMAKER=/Developer/Applications/Utilities/PackageMaker.app/Contents/MacOS/PackageMaker*
-
-UNIV_ARCH=-arch ppc -arch i386
-MAC_SYSROOT=Developer/SDKs/MacOSX10.4u.sdk
-
+#PACKAGEMAKER=/Developer/Applications/Utilities/PackageMaker.app/Contents/MacOS/PackageMaker*
+PACKAGEMAKER=/Developer/usr/bin/packagemaker
 PKG_CONF_FLAGS=
-#CXXFLAGS="$(CXXFLAGS) $(UNIV_ARCH) -isysroot /$(MAC_SYSROOT)" \
-#CFLAGS="$(CFLAGS) $(UNIV_ARCH) -isysroot /$(MAC_SYSROOT)" \
-#LDFLAGS="$(LDFLAGS) $(UNIV_ARCH) -Wl,-syslibroot,/$(MAC_SYSROOT)"
-
-# LDFLAGS="$(LDFLAGS) $(UNIV_ARCH) -Wl,-syslibroot,$(MAC_SYSROOT)"
 
 clean-pkg:
 	-rm -rf mac_osx @PACKAGE@-@PACKAGE_VERSION@.pkg
@@ -180,13 +172,18 @@ pkg-build:
 	DESTDIR=${PWD}/mac_osx make install
 
 pkg-main:
-	./OSX_Resources/update_mac_package_contents.pl README "configure.ac" "mac_osx/usr"
-	${PACKAGEMAKER} -build -p @PACKAGE@-@PACKAGE_VERSION@.pkg \
-		-f mac_osx/usr \
-		-ds -r OSX_Resources \
-		-i OSX_Resources/Info.plist \
-		-d OSX_Resources/Description.plist
-	-rm -rf mac_osx
+	${PACKAGEMAKER} --root mac_osx/usr --id org.opendap.libdap \
+		--title " @PACKAGE@ @PACKAGE_VERSION@"  --version @PACKAGE_VERSION@ \
+		--out @PACKAGE@-@PACKAGE_VERSION@.pkg --resources OSX_Resources
+
+#	./OSX_Resources/update_mac_package_contents.pl README "configure.ac" "mac_osx/usr"
+
+# old options
+#-build -p @PACKAGE@-@PACKAGE_VERSION@.pkg 
+#-f mac_osx/usr 
+#-ds -r OSX_Resources 
+#-i OSX_Resources/Info.plist 
+#-d OSX_Resources/Description.plist
 
 pkg-dmg:
 	-rm -rf @PACKAGE@-@PACKAGE_VERSION@
