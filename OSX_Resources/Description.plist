@@ -5,6 +5,6 @@
 	<key>IFPkgDescriptionDescription</key>
 	<string></string>
 	<key>IFPkgDescriptionTitle</key>
-	<string>OPeNDAP DAP 2.0 and 3.4 Package</string>
+	<string>OPeNDAP Back-End Server (BES) Package</string>
 </dict>
 </plist>
