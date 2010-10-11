@@ -174,7 +174,7 @@ pkg-build:
 
 pkg-main:
 	./OSX_Resources/update_mac_package_contents.pl README
-	${PACKAGEMAKER} --root mac_osx/usr --id org.opendap.@PACKAGE@ \
+	${PACKAGEMAKER} --root mac_osx --id org.opendap.@PACKAGE@ \
 		--title "@PACKAGE@ @PACKAGE_VERSION@" --version @PACKAGE_VERSION@ \
 		--out @PACKAGE@-@PACKAGE_VERSION@.pkg --resources OSX_Resources
 
@@ -182,7 +182,7 @@ pkg-dmg:
 	-rm -rf @PACKAGE@-@PACKAGE_VERSION@
 	-rm -rf @PACKAGE@-@PACKAGE_VERSION@.dmg
 	mkdir @PACKAGE@-@PACKAGE_VERSION@
-	mv @PACKAGE@-@PACKAGE_VERSION@.pkg @PACKAGE@-@PACKAGE_VERSION@
+	cp -r @PACKAGE@-@PACKAGE_VERSION@.pkg @PACKAGE@-@PACKAGE_VERSION@
 	cp README README.* NEWS @PACKAGE@-@PACKAGE_VERSION@
 	dropdmg -i --sanitize-for-servers --format zlib @PACKAGE@-@PACKAGE_VERSION@
 	-rm -rf @PACKAGE@-@PACKAGE_VERSION@

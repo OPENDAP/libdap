@@ -5,6 +5,6 @@
 	<key>IFPkgDescriptionDescription</key>
 	<string></string>
 	<key>IFPkgDescriptionTitle</key>
-	<string>OPeNDAP Back-End Server (BES) Package</string>
+	<string>OPeNDAP DAP versions 2 and 3 C++ Implementation</string>
 </dict>
 </plist>
