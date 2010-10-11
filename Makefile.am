@@ -159,7 +159,8 @@ rpm: dist
 # are there so that the values built into dap-config will match the mac
 # osx install dirs and not the temp directory used to build the packages
 
-#PACKAGEMAKER=/Developer/Applications/Utilities/PackageMaker.app/Contents/MacOS/PackageMaker*
+# PACKAGEMAKER=/Developer/Applications/Utilities/PackageMaker.app/Contents/MacOS/PackageMaker*
+
 PACKAGEMAKER=/Developer/usr/bin/packagemaker
 PKG_CONF_FLAGS=
 
@@ -169,21 +170,13 @@ clean-pkg:
 pkg-build:
 	./configure --prefix=/usr --disable-dependency-tracking $(PKG_CONF_FLAGS)
 	make clean all
-	DESTDIR=${PWD}/mac_osx make install
+	DESTDIR=`pwd`/mac_osx make install
 
 pkg-main:
-	${PACKAGEMAKER} --root mac_osx/usr --id org.opendap.libdap \
-		--title " @PACKAGE@ @PACKAGE_VERSION@"  --version @PACKAGE_VERSION@ \
+	./OSX_Resources/update_mac_package_contents.pl README
+	${PACKAGEMAKER} --root mac_osx/usr --id org.opendap.@PACKAGE@ \
+		--title "@PACKAGE@ @PACKAGE_VERSION@" --version @PACKAGE_VERSION@ \
 		--out @PACKAGE@-@PACKAGE_VERSION@.pkg --resources OSX_Resources
-
-#	./OSX_Resources/update_mac_package_contents.pl README "configure.ac" "mac_osx/usr"
-
-# old options
-#-build -p @PACKAGE@-@PACKAGE_VERSION@.pkg 
-#-f mac_osx/usr 
-#-ds -r OSX_Resources 
-#-i OSX_Resources/Info.plist 
-#-d OSX_Resources/Description.plist
 
 pkg-dmg:
 	-rm -rf @PACKAGE@-@PACKAGE_VERSION@
