@@ -168,7 +168,7 @@ clean-pkg:
 	-rm -rf mac_osx @PACKAGE@-@PACKAGE_VERSION@.pkg
 
 pkg-build:
-	./configure --prefix=/usr --disable-dependency-tracking $(PKG_CONF_FLAGS)
+	./configure --prefix=$(prefix) --disable-dependency-tracking $(PKG_CONF_FLAGS)
 	make clean all
 	DESTDIR=`pwd`/mac_osx make install
 
