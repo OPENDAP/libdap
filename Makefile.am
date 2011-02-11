@@ -167,12 +167,12 @@ PKG_CONF_FLAGS=
 clean-pkg:
 	-rm -rf mac_osx @PACKAGE@-@PACKAGE_VERSION@.pkg
 
-pkg-build:
+pkg-build: clean-pkg
 	./configure --prefix=$(prefix) --disable-dependency-tracking $(PKG_CONF_FLAGS)
 	make clean all
 	DESTDIR=`pwd`/mac_osx make install
 
-pkg-main:
+pkg-main: pkg-build
 	./OSX_Resources/update_mac_package_contents.pl README
 	cat ./OSX_Resources/Info.plist.proto | sed -e "s^_PREFIX_^$(prefix)^g" > foo
 	mv foo ./OSX_Resources/Info.plist
@@ -180,7 +180,7 @@ pkg-main:
 		--title "@PACKAGE@ @PACKAGE_VERSION@" --version @PACKAGE_VERSION@ \
 		--out @PACKAGE@-@PACKAGE_VERSION@.pkg --resources OSX_Resources
 
-pkg-dmg:
+pkg-dmg: pkg-main
 	-rm -rf @PACKAGE@-@PACKAGE_VERSION@
 	-rm -rf @PACKAGE@-@PACKAGE_VERSION@.dmg
 	mkdir @PACKAGE@-@PACKAGE_VERSION@
@@ -189,7 +189,7 @@ pkg-dmg:
 	dropdmg -i --sanitize-for-servers --format zlib @PACKAGE@-@PACKAGE_VERSION@
 	-rm -rf @PACKAGE@-@PACKAGE_VERSION@
 
-pkg: clean-pkg pkg-build pkg-main pkg-dmg
+pkg: pkg-main 
 
 # Note that the gcov options -f and -b are useful but sometimes make looking
 # at the results of coverage analysis a little taxing. -b reports on all
