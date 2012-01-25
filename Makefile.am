@@ -200,7 +200,7 @@ GRAM_SRC = lex.das.cc das.tab.cc das.tab.hh \
 	lex.Error.cc Error.tab.cc Error.tab.hh gse.tab.hh gse.tab.cc \
 	lex.gse_.cc
 
-# GFDIR = gridfields/
+GFDIR = gridfields/
 GRIDFIELD_SRC = gridfields/apply.cc      gridfields/gridfield.cc \
 gridfields/array.cc      gridfields/gridfieldoperator.cc \
 gridfields/cellarray.cc  gridfields/implicit0cells.cc \
@@ -262,6 +262,7 @@ DAP_HDR = AttrTable.h DAS.h DDS.h DataDDS.h DDXParserSAX2.h DDXExceptions.h	\
 	util.h escaping.h parser.h debug.h dods-limits.h dods-datatypes.h \
 	GeoConstraint.h GridGeoConstraint.h ArrayGeoConstraint.h	  \
 	ce_functions.h  gse_parser.h GSEClause.h util_mit.h		  \
+	$(GRIDFIELD_HDR)		  \
 	expr.h Clause.h RValue.h ConstraintEvaluator.h ce_parser.h	  \
 	DapIndent.h DapObj.h XDRFileMarshaller.h Marshaller.h		  \
 	XDRFileUnMarshaller.h UnMarshaller.h XDRStreamMarshaller.h	  \
