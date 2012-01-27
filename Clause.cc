@@ -52,13 +52,13 @@ using std::endl;
 namespace libdap {
 
 Clause::Clause(const int oper, rvalue *a1, rvalue_list *rv)
-        : _op(oper), _b_func(0), _bt_func(0), _arg1(a1), _args(rv)
+        : _op(oper), _b_func(0), _bt_func(0), _argc(0), _arg1(a1), _args(rv)
 {
     assert(OK());
 }
 #if 1
 Clause::Clause(bool_func func, rvalue_list *rv)
-        : _op(0), _b_func(func), _bt_func(0), _arg1(0), _args(rv)
+        : _op(0), _b_func(func), _bt_func(0), _argc(0), _arg1(0), _args(rv)
 {
     assert(OK());
 
@@ -69,7 +69,7 @@ Clause::Clause(bool_func func, rvalue_list *rv)
 }
 #endif
 Clause::Clause(btp_func func, rvalue_list *rv)
-        : _op(0), _b_func(0), _bt_func(func), _arg1(0), _args(rv)
+        : _op(0), _b_func(0), _bt_func(func), _argc(0), _arg1(0), _args(rv)
 {
     assert(OK());
 
@@ -79,7 +79,7 @@ Clause::Clause(btp_func func, rvalue_list *rv)
         _argc = 0;
 }
 
-Clause::Clause() : _op(0), _b_func(0), _bt_func(0), _arg1(0), _args(0)
+Clause::Clause() : _op(0), _b_func(0), _bt_func(0), _argc(0), _arg1(0), _args(0)
 {}
 
 static inline void
@@ -143,41 +143,13 @@ Clause::value_clause()
     return (_bt_func != 0);
 }
 
-#if 0
-static bool
-boolean_value(BaseType *btp)
-{
-    switch (btp->type()) {
-        case dods_byte_c:
-            return !dynamic_cast<Byte&>(*btp).value();
-        case dods_int16_c:
-            return !dynamic_cast<Int16&>(*btp).value();
-        case dods_uint16_c:
-            return !dynamic_cast<UInt16&>(*btp).value();
-        case dods_int32_c:
-            return !dynamic_cast<Int32&>(*btp).value();
-        case dods_uint32_c:
-            return !dynamic_cast<UInt32&>(*btp).value();
-        case dods_float32_c:
-        case dods_float64_c:
-        case dods_str_c:
-        case dods_url_c:
-        case dods_array_c:
-        case dods_structure_c:
-        case dods_sequence_c:
-        case dods_grid_c:
-        default:
-            throw Error(malformed_expr, "A Function returning something other than an integer was used in a boolean context.");
-    }
-}
-#endif
-
 /** @brief Evaluate a clause which returns a boolean value
     This method must only be evaluated for clauses with relational
     expressions or boolean functions.
-    @param dataset This is passed to the rvalue::bvalue() method.
+
     @param dds Use variables from this DDS when evaluating the
     expression
+
     @return True if the clause is true, false otherwise.
     @exception InternalErr if called for a clause that returns a
     BaseType pointer. */
@@ -220,12 +192,12 @@ Clause::value(DDS &dds)
 
 /** @brief Evaluate a clause that returns a value via a BaseType
     pointer.
-    This method must only be evaluated for clauses with relational
-    expressions or boolean functions.
-    @param dataset This is passed to the function.
+    This method should be called only for those clauses that return values.
+
     @param dds Use variables from this DDS when evaluating the
     expression
     @param value A value-result parameter
+
     @return True if the the BaseType pointer is not null, false otherwise.
     @exception InternalErr if called for a clause that returns a
     boolean value. Not that this method itself \e does return a
@@ -242,10 +214,8 @@ Clause::value(DDS &dds, BaseType **value)
         // to the functions themselves. 9/25/06 jhrg
         BaseType **argv = build_btp_args(_args, dds);
 
-#if 0
-        *value = (*_bt_func)(_argc, argv, dds);
-#endif
         (*_bt_func)(_argc, argv, dds, value);
+
         delete[] argv;  // Cache me!
         argv = 0;
 

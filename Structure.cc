@@ -270,6 +270,7 @@ Structure::read()
     return false ;
 }
 
+// TODO Recode to use width(bool)
 unsigned int
 Structure::width()
 {
@@ -281,6 +282,32 @@ Structure::width()
 
     return sz;
 }
+
+/** This version of width simply returns the same thing as width() for simple
+    types and Arrays. For Structure it returns the total size if constrained
+    is false, or the size of the elements in the current projection if true.
+
+    @param constrained If true, return the size after applying a constraint.
+    @return  The number of bytes used by the variable.
+ */
+unsigned int
+Structure::width(bool constrained)
+{
+    unsigned int sz = 0;
+
+    for (Vars_iter i = _vars.begin(); i != _vars.end(); i++) {
+    	if (constrained) {
+    		if ((*i)->send_p())
+    			sz += (*i)->width(constrained);
+    	}
+    	else {
+    		sz += (*i)->width(constrained);
+    	}
+    }
+
+    return sz;
+}
+
 
 void
 Structure::intern_data(ConstraintEvaluator & eval, DDS & dds)
@@ -445,7 +472,8 @@ Structure::m_exact_match(const string &name, btp_stack *s)
 
     return 0;
 }
-//#if FILE_METHODS
+
+#if FILE_METHODS
 void
 Structure::print_val(FILE *out, string space, bool print_decl_p)
 {
@@ -465,7 +493,8 @@ Structure::print_val(FILE *out, string space, bool print_decl_p)
     if (print_decl_p)
         fprintf(out, ";\n") ;
 }
-//#endif
+#endif
+
 void
 Structure::print_val(ostream &out, string space, bool print_decl_p)
 {

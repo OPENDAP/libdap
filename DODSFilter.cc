@@ -36,8 +36,6 @@
 
 #include "config.h"
 
-#undef FILE_METHODS
-
 static char rcsid[] not_used =
     {"$Id$"
     };
@@ -71,11 +69,12 @@ static char rcsid[] not_used =
 #include "util.h"
 #include "escaping.h"
 #include "DODSFilter.h"
-#if 0
+#if FILE_METHODS
 #include "XDRFileMarshaller.h"
 #endif
 #include "XDRStreamMarshaller.h"
 #include "InternalErr.h"
+
 #ifndef WIN32
 #include "SignalHandler.h"
 #include "EventHandler.h"
@@ -83,6 +82,8 @@ static char rcsid[] not_used =
 #endif
 
 #define CRLF "\r\n"             // Change here, expr-test.cc and DODSFilter.cc
+
+//#undef FILE_METHODS
 
 using namespace std;
 
@@ -103,17 +104,6 @@ const string usage =
     <time>, return an HTTP 304 response.\n\
     -t <seconds>: Timeout the handler after <seconds>.\n\
     -h: This message.";
-
-#if 0
-// Removed the call to waitpid in send_data() because calling fflush
-// addresses the problem wait() was supposed to solve and calling wait() is
-// the root of ticket #335. jhrg 3/10/06
-#ifdef WIN32
-#define WAITPID(pid) while(_cwait(NULL, pid, NULL) > 0)
-#else
-#define WAITPID(pid) while(waitpid(pid, 0, 0) > 0)
-#endif
-#endif
 
 /** Create an instance of DODSFilter using the command line
 arguments passed by the CGI (or other) program.  The default
@@ -659,41 +649,6 @@ DODSFilter::establish_timeout(ostream &stream) const
 #endif
 }
 
-#if 0
-/** Read the ancillary DAS information and merge it into the input
-    DAS object.
-
-    @brief Test if ancillary data must be read.
-    @param das A DAS object that will be augmented with the
-    ancillary data attributes.
-    @param anc_location The directory in which the external DAS file resides.
-    @return void
-    @see DAS */
-void
-DODSFilter::read_ancillary_das(DAS &das, const string &anc_location) const
-{
-    Ancillary::read_ancillary_das( das, d_dataset,
-			       (anc_location == "") ? d_anc_dir : anc_location,
-			       d_anc_file);
-}
-
-/** Read the ancillary DDS information and merge it into the input
-    DDS object.
-
-    @brief Test if ancillary data must be read.
-    @param dds A DDS object that will be augmented with the
-    ancillary data properties.
-    @param anc_location The directory in which the external DAS file resides.
-    @return void
-    @see DDS */
-void
-DODSFilter::read_ancillary_dds(DDS &dds, const string &anc_location) const
-{
-    Ancillary::read_ancillary_dds( dds, d_dataset,
-			       (anc_location == "") ? d_anc_dir : anc_location,
-			       d_anc_file);
-}
-#endif
 static const char *emessage = "DODS internal server error; usage error. Please report this to the dataset maintainer, or to the opendap-tech@opendap.org mailing list.";
 
 /** This message is printed when the filter program is incorrectly
@@ -910,7 +865,6 @@ DODSFilter::functional_constraint(BaseType &var, DDS &dds,
 
     fflush(out);
 
-    // Grab a stream encodes using XDR.
     XDRFileMarshaller m( out ) ;
 
     try {
@@ -936,7 +890,7 @@ DODSFilter::functional_constraint(BaseType &var, DDS &dds,
 
     out << flush ;
 
-    // Grab a stream encodes using XDR.
+    // Grab a stream that encodes using XDR.
     XDRStreamMarshaller m( out ) ;
 
     try {
@@ -951,7 +905,7 @@ DODSFilter::functional_constraint(BaseType &var, DDS &dds,
 #if FILE_METHODS
 void
 DODSFilter::dataset_constraint(DDS & dds, ConstraintEvaluator & eval,
-                               FILE * out) const
+                               FILE * out, bool ce_eval) const
 {
     // send constrained DDS
     dds.print_constrained(out);
@@ -966,7 +920,7 @@ DODSFilter::dataset_constraint(DDS & dds, ConstraintEvaluator & eval,
         for (DDS::Vars_iter i = dds.var_begin(); i != dds.var_end(); i++)
             if ((*i)->send_p()) {
                 DBG(cerr << "Sending " << (*i)->name() << endl);
-                (*i)->serialize(eval, dds, m, true);
+                (*i)->serialize(eval, dds, m, ce_eval);
             }
     }
     catch (Error & e) {
@@ -977,7 +931,7 @@ DODSFilter::dataset_constraint(DDS & dds, ConstraintEvaluator & eval,
 
 void
 DODSFilter::dataset_constraint(DDS & dds, ConstraintEvaluator & eval,
-                               ostream &out) const
+                               ostream &out, bool ce_eval) const
 {
     // send constrained DDS
     dds.print_constrained(out);
@@ -992,7 +946,7 @@ DODSFilter::dataset_constraint(DDS & dds, ConstraintEvaluator & eval,
         for (DDS::Vars_iter i = dds.var_begin(); i != dds.var_end(); i++)
             if ((*i)->send_p()) {
                 DBG(cerr << "Sending " << (*i)->name() << endl);
-                (*i)->serialize(eval, dds, m, true);
+                (*i)->serialize(eval, dds, m, ce_eval);
             }
     }
     catch (Error & e) {
@@ -1003,7 +957,7 @@ DODSFilter::dataset_constraint(DDS & dds, ConstraintEvaluator & eval,
 void
 DODSFilter::dataset_constraint_ddx(DDS & dds, ConstraintEvaluator & eval,
                                ostream &out, const string &boundary,
-                               const string &start) const
+                               const string &start, bool ce_eval) const
 {
     // Write the MPM headers for the DDX (text/xml) part of the response
     set_mime_ddx_boundary(out, boundary, start, dap4_ddx);
@@ -1033,7 +987,7 @@ DODSFilter::dataset_constraint_ddx(DDS & dds, ConstraintEvaluator & eval,
         for (DDS::Vars_iter i = dds.var_begin(); i != dds.var_end(); i++)
             if ((*i)->send_p()) {
                 DBG(cerr << "Sending " << (*i)->name() << endl);
-                (*i)->serialize(eval, dds, m, true);
+                (*i)->serialize(eval, dds, m, ce_eval);
             }
     }
     catch (Error & e) {
@@ -1083,11 +1037,9 @@ DODSFilter::send_data(DDS & dds, ConstraintEvaluator & eval,
     dds.tag_nested_sequences(); // Tag Sequences as Parent or Leaf node.
 
     // Start sending the response...
-#if COMPRESSION_FOR_SERVER3
-    bool compress = d_comp && deflate_exists();
-#endif
 
     // Handle *functional* constraint expressions specially
+#if 0
     if (eval.functional_expression()) {
         // Get the result and then start sending the headers. This provides a
         // way to send errors back to the client w/o colliding with the
@@ -1116,17 +1068,17 @@ DODSFilter::send_data(DDS & dds, ConstraintEvaluator & eval,
         delete var;
         var = 0;
     }
-    else {
-#if COMPRESSION_FOR_SERVER3
-        if (with_mime_headers)
-            set_mime_binary(data_stream, dods_data, d_cgi_ver,
-                            (compress) ? deflate : x_plain, data_lmt);
-        fflush(data_stream);
-
-        int childpid;
-        if (compress)
-            data_stream = compressor(data_stream, childpid);
 #endif
+    if (eval.function_clauses()) {
+	DDS *fdds = eval.eval_function_clauses(dds);
+
+        if (with_mime_headers)
+            set_mime_binary(data_stream, dods_data, d_cgi_ver, x_plain, data_lmt);
+
+        dataset_constraint(*fdds, eval, data_stream, false);
+	delete fdds;
+    }
+    else {
         if (with_mime_headers)
             set_mime_binary(data_stream, dods_data, d_cgi_ver, x_plain, data_lmt);
 
@@ -1180,6 +1132,7 @@ DODSFilter::send_data(DDS & dds, ConstraintEvaluator & eval,
     // Start sending the response...
 
     // Handle *functional* constraint expressions specially
+#if 0
     if (eval.functional_expression()) {
         // Get the result and then start sending the headers. This provides a
         // way to send errors back to the client w/o colliding with the
@@ -1197,6 +1150,15 @@ DODSFilter::send_data(DDS & dds, ConstraintEvaluator & eval,
         functional_constraint(*var, dds, eval, data_stream);
         delete var;
         var = 0;
+    }
+#endif
+    if (eval.function_clauses()) {
+	DDS *fdds = eval.eval_function_clauses(dds);
+        if (with_mime_headers)
+            set_mime_binary(data_stream, dods_data, d_cgi_ver, x_plain, data_lmt);
+
+        dataset_constraint(*fdds, eval, data_stream, false);
+	delete fdds;
     }
     else {
         if (with_mime_headers)
@@ -1293,14 +1255,18 @@ DODSFilter::send_ddx(DDS &dds, ConstraintEvaluator &eval, ostream &out,
     response back to the client.
 
     @brief Transmit data.
+
     @param dds A DDS object containing the data to be sent.
     @param eval A reference to the ConstraintEvaluator to use.
     @param data_stream Write the response to this stream.
+    @param start
+    @param boundary
     @param anc_location A directory to search for ancillary files (in
     addition to the CWD).  This is used in a call to
     get_data_last_modified_time().
     @param with_mime_headers If true, include the MIME headers in the response.
     Defaults to true.
+
     @return void */
 void
 DODSFilter::send_data_ddx(DDS & dds, ConstraintEvaluator & eval,
@@ -1330,6 +1296,7 @@ DODSFilter::send_data_ddx(DDS & dds, ConstraintEvaluator & eval,
     // Start sending the response...
 
     // Handle *functional* constraint expressions specially
+#if 0
     if (eval.functional_expression()) {
         BaseType *var = eval.eval_function(dds, d_dataset);
         if (!var)
@@ -1349,6 +1316,16 @@ DODSFilter::send_data_ddx(DDS & dds, ConstraintEvaluator & eval,
         delete var;
         var = 0;
     }
+#endif
+    if (eval.function_clauses()) {
+    	DDS *fdds = eval.eval_function_clauses(dds);
+        if (with_mime_headers)
+            set_mime_multipart(data_stream, boundary, start, dap4_data_ddx,
+        	    d_cgi_ver, x_plain, data_lmt);
+        data_stream << flush ;
+        dataset_constraint(*fdds, eval, data_stream, false);
+    	delete fdds;
+    }
     else {
         if (with_mime_headers)
             set_mime_multipart(data_stream, boundary, start, dap4_data_ddx,
@@ -1363,71 +1340,5 @@ DODSFilter::send_data_ddx(DDS & dds, ConstraintEvaluator & eval,
 	data_stream << CRLF << "--" << boundary << "--" << CRLF;
 }
 
-#if 0
-#if FILE_METHODS
-/** Write the BLOB response to the client.
-    @param dds Use the variables in this DDS to generate the BLOB response.
-    @param out Dump the response to this FILE pointer.
-    @param with_mime_headers If true (the default) send MIME headers. */
-void
-DODSFilter::send_blob(DDS &, FILE *, bool)
-{
-#if 0
-    // Broken. jhrg 4/3/06
-    bool compress = d_comp && deflate_exists();
-    time_t data_lmt = get_data_last_modified_time(d_anc_dir);
-
-    // If this is a conditional request and the server should send a 304
-    // response, do that and exit. Otherwise, continue on and send the full
-    // response.
-    if (is_conditional() && data_lmt <= get_request_if_modified_since()
-        && with_mime_headers) {
-        set_mime_not_modified(out);
-        return;
-    }
-
-    dds.parse_constraint(d_ce);
-
-    // Handle *functional* constraint expressions specially
-    if (dds.functional_expression()) {
-        BaseType *var = dds.eval_function(d_dataset);
-        if (!var)
-            throw Error("Error calling the CE function.");
-
-        if (with_mime_headers)
-            set_mime_binary(out, dods_data, d_cgi_ver,
-                            (compress) ? deflate : x_plain, data_lmt);
-
-        FILE *comp_sink;
-        XDR *xdr_sink;
-        int childpid = get_sinks(out, compress, &comp_sink, &xdr_sink);
-
-        // In the following call to serialize, suppress CE evaluation.
-        if (!var->serialize(d_dataset, dds, xdr_sink, false))
-            throw Error("Could not send the function result.");
-
-        clean_sinks(childpid, compress, xdr_sink, comp_sink);
-    }
-    else {
-        if (with_mime_headers)
-            set_mime_binary(out, dods_data, d_cgi_ver,
-                            (compress) ? deflate : x_plain, data_lmt);
-
-        FILE *comp_sink;
-        XDR *xdr_sink;
-        int childpid = get_sinks(out, compress, &comp_sink, &xdr_sink);
-
-        for (DDS::Vars_iter i = dds.var_begin(); i != dds.var_end(); i++)
-            if ((*i)->send_p()) // only process projected variables
-                if (!(*i)->serialize(d_dataset, dds, xdr_sink, true))
-                    throw Error(string("Could not serialize variable '")
-                                + (*i)->name() + string("'."));
-
-        clean_sinks(childpid, compress, xdr_sink, comp_sink);
-    }
-#endif
-}
-#endif
-#endif
 } // namespace libdap
 

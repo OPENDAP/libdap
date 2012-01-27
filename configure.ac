@@ -2,10 +2,10 @@
 dnl -*- autoconf -*-
 dnl Process this file with autoconf to produce a configure script.
 
-AC_PREREQ(2.61)
+AC_PREREQ(2.62)
 dnl Update version here and below at LIB_CURRENT, ..., if needed.
-AC_INIT(libdap, 3.10.0, opendap-tech@opendap.org)
-AC_DEFINE(DAP_PROTOCOL_VERSION, ["3.2"], [Highest DAP version implemented?])
+AC_INIT(libdap, 3.11.1, opendap-tech@opendap.org)
+AC_DEFINE(DAP_PROTOCOL_VERSION, ["3.4"], [Highest DAP version implemented?])
 AC_SUBST(DAP_PROTOCOL_VERSION)
 
 AC_CONFIG_SRCDIR([Connect.cc])
@@ -14,27 +14,30 @@ AM_CONFIG_HEADER([config.h dods-datatypes-config.h xdr-datatypes-config.h])
 AC_CONFIG_MACRO_DIR([conf])
 
 AM_INIT_AUTOMAKE
-# The second arg test autotest to look for the getocapi exec here, in the 
-# $top_srcdir since when relative paths are used with autotest it assumes 
-# they are relative to $top_srcdir. Without the second argument autotest
-# will use 'tests' as the value which breaks since the exec is not in the
-# Tests subdir. jhrg
 AC_CONFIG_TESTDIR(tests, [.])
 
-AC_DEFINE([FILE_METHODS], [1], [Define this to activate the old FILE * methods.])
+dnl AC_DEFINE([FILE_METHODS], [1], [Define this to activate the old FILE * methods.])
 
 AC_DEFINE(CNAME, "libdap", [What sort of HTTP client is this?])
 AC_DEFINE_UNQUOTED(CVER, "$PACKAGE_VERSION", [Client version number])
 AC_DEFINE_UNQUOTED(DVR, "libdap/$PACKAGE_VERSION", [Client name and version combined])
 AC_SUBST(DVR)
 
+
+PACKAGE_MAJOR_VERSION=`echo $PACKAGE_VERSION | sed 's@^\([[0-9]]\)*\.\([[0-9]]*\)\.\([[0-9]]*\)$@\1@'`
+PACKAGE_MINOR_VERSION=`echo $PACKAGE_VERSION | sed 's@^\([[0-9]]\)*\.\([[0-9]]*\)\.\([[0-9]]*\)$@\2@'`
+PACKAGE_SUBMINOR_VERSION=`echo $PACKAGE_VERSION | sed 's@^\([[0-9]]\)*\.\([[0-9]]*\)\.\([[0-9]]*\)$@\3@'`
+AC_MSG_NOTICE(Package Major Version:     $PACKAGE_MAJOR_VERSION)
+AC_MSG_NOTICE(Package Minor Version:     $PACKAGE_MINOR_VERSION)
+AC_MSG_NOTICE(Package SubMinor Version:  $PACKAGE_SUBMINOR_VERSION)
+AC_SUBST(PACKAGE_MAJOR_VERSION)
+AC_SUBST(PACKAGE_MINOR_VERSION)
+AC_SUBST(PACKAGE_SUBMINOR_VERSION)
+
+
+
 AC_DEFINE(EVAL, 1, [Should all the classes run ConstraintEvaluator::eval()?])
 AC_SUBST(EVAL)
-
-# As of 9/25/09 we're dropping support for Server3
-# 
-# AC_DEFINE(COMPRESSION_FOR_SERVER3, 0, [Should the subprocess compression for Server3 be included?])
-# AC_SUBST(COMPRESSION_FOR_SERVER3)
 
 dnl flags for the compilers and linkers - set these before locating the
 dnl actual tools since some of the AC_PROG macros set these `flag variables'
@@ -45,8 +48,8 @@ AC_SUBST(host)
 
 dnl library version: Update these when the interface changes. Generally,
 dnl assume that the interface tracks the major and minor release numbers.
-DAPLIB_CURRENT=10
-DAPLIB_AGE=0
+DAPLIB_CURRENT=14
+DAPLIB_AGE=3
 DAPLIB_REVISION=0
 AC_SUBST(DAPLIB_CURRENT)
 AC_SUBST(DAPLIB_AGE)
@@ -55,8 +58,8 @@ AC_SUBST(DAPLIB_REVISION)
 LIBDAP_VERSION="$DAPLIB_CURRENT:$DAPLIB_REVISION:$DAPLIB_AGE"
 AC_SUBST(LIBDAP_VERSION)
 
-CLIENTLIB_CURRENT=3
-CLIENTLIB_AGE=0
+CLIENTLIB_CURRENT=4
+CLIENTLIB_AGE=1
 CLIENTLIB_REVISION=0
 AC_SUBST(CLIENTLIB_CURRENT)
 AC_SUBST(CLIENTLIB_AGE)
@@ -65,8 +68,8 @@ AC_SUBST(CLIENTLIB_REVISION)
 CLIENTLIB_VERSION="$CLIENTLIB_CURRENT:$CLIENTLIB_REVISION:$CLIENTLIB_AGE"
 AC_SUBST(CLIENTLIB_VERSION)
 
-SERVERLIB_CURRENT=7
-SERVERLIB_AGE=0
+SERVERLIB_CURRENT=9
+SERVERLIB_AGE=2
 SERVERLIB_REVISION=0
 AC_SUBST(SERVERLIB_CURRENT)
 AC_SUBST(SERVERLIB_AGE)
@@ -147,71 +150,112 @@ gl_MODULES(regex)
 
 gl_INIT
 
+AC_ARG_WITH(curl,[  --with-curl=PFX   Prefix where curl/libcurl is installed (optional). This will override pkgconfig, etc.],
+            with_curl_prefix="$withval", with_curl_prefix="")
+
 dnl I wrote these checks because we need the *-config scripts to build, so 
 dnl the AC_CHECK_LIB macro is not needed.
 
 curlprivatereq=
 curlprivatelibs=
-libdap_pkgconfig_libcurl=yes
-libdap_libcurl_module='libcurl >= 7.10.6'
-PKG_CHECK_MODULES([CURL],[$libdap_libcurl_module],,
-  [libdap_pkgconfig_libcurl=no])
-AC_MSG_CHECKING([for libcurl])
-if test $libdap_pkgconfig_libcurl = 'yes'
+curl_set=
+
+if test -n "$with_curl_prefix" -a -x $with_curl_prefix/bin/curl-config
 then
-	curlprivatereq=$libdap_libcurl_module
-	CURL_STATIC_LIBS="`$PKG_CONFIG --static --libs libcurl`"
-	AC_MSG_RESULT([yes; used pkg-config])
-elif curl-config --version > /dev/null 2>&1
+    AC_MSG_NOTICE([Using $with_curl_prefix as the curl prefix directory.])
+    CURL_LIBS="`$with_curl_prefix/bin/curl-config --libs`"
+    CURL_STATIC_LIBS=$CURL_LIBS
+    curlprivatelibs="`$with_curl_prefix/bin/curl-config --libs`"
+    CURL_CFLAGS="`$with_curl_prefix/bin/curl-config --cflags`"
+    curl_set="yes"
+elif test -n "$with_curl_prefix"
 then
-	version_libcurl=`curl-config --version | sed 's@libcurl \(.*\)@\1@'`
-
-	version_M=`echo $version_libcurl | sed 's@^\([[0-9]]\)*\.\([[0-9]]*\)\.\([[0-9]]*\)$@\1@'`
-	version_m=`echo $version_libcurl | sed 's@^\([[0-9]]\)*\.\([[0-9]]*\)\.\([[0-9]]*\)$@\2@'`
-	version_m_m=`echo $version_libcurl | sed 's@^\([[0-9]]\)*\.\([[0-9]]*\)\.\([[0-9]]*\)$@\3@'`
-	
-	dnl echo "version_M: $version_M"
-	dnl echo "version_m: $version_m"
-	dnl echo "version_m_m: $version_m_m"
-
-	dnl Test for several different versions of libcurl. We can use 7.10.6
-	dnl or newer.
-	
-	if test $version_M -gt 7
-	then
-		libcurl_ok='yes'
-	elif test $version_M -eq 7 && test $version_m -gt 10
-	then
-		libcurl_ok='yes'
-	elif test $version_M -eq 7 && test $version_m -eq 10 && test $version_m_m -gt 5
-	then
-		libcurl_ok='yes'
-	else
-		libcurl_ok='no'
-	fi
-
-	dnl First test the minimum
-	if test $libcurl_ok = "no"
-	then
-		AC_MSG_ERROR([must have libcurl 7.10.6 or greater, found $version_libcurl])
-	fi
-
-	CURL_LIBS="`curl-config --libs`"
-	CURL_STATIC_LIBS=$CURL_LIBS
-	curlprivatelibs="`curl-config --libs`"
-	CURL_CFLAGS="`curl-config --cflags`"
-	AC_MSG_RESULT([yes; used curl-config])
-else
-	AC_MSG_ERROR([I could not find libcurl])
+    AC_MSG_ERROR([You set the curl-prefix directory to $with_curl_prefix, but curl-config is not there.])
 fi
+
+if test -z "$curl_set"
+then
+    # curlprivatereq=
+    # curlprivatelibs=
+    libdap_pkgconfig_libcurl=yes
+    libdap_libcurl_module='libcurl >= 7.10.6'
+    PKG_CHECK_MODULES([CURL],[$libdap_libcurl_module],,
+        [libdap_pkgconfig_libcurl=no])
+    AC_MSG_CHECKING([for libcurl])
+    
+    if test $libdap_pkgconfig_libcurl = 'yes'
+    then
+	   curlprivatereq=$libdap_libcurl_module
+	   CURL_STATIC_LIBS="`$PKG_CONFIG --static --libs libcurl`"
+	   AC_MSG_RESULT([yes; used pkg-config])
+    elif curl-config --version > /dev/null 2>&1
+    then
+	   version_libcurl=`curl-config --version | sed 's@libcurl \(.*\)@\1@'`
+
+	   version_M=`echo $version_libcurl | sed 's@^\([[0-9]]\)*\.\([[0-9]]*\)\.\([[0-9]]*\)$@\1@'`
+	   version_m=`echo $version_libcurl | sed 's@^\([[0-9]]\)*\.\([[0-9]]*\)\.\([[0-9]]*\)$@\2@'`
+	   version_m_m=`echo $version_libcurl | sed 's@^\([[0-9]]\)*\.\([[0-9]]*\)\.\([[0-9]]*\)$@\3@'`
+	
+       dnl Test for several different versions of libcurl. We can use 7.10.6
+	   dnl or newer.
+	
+       if test $version_M -gt 7
+	   then
+		  libcurl_ok='yes'
+	   elif test $version_M -eq 7 && test $version_m -gt 10
+	   then
+		  libcurl_ok='yes'
+	   elif test $version_M -eq 7 && test $version_m -eq 10 && test $version_m_m -gt 5
+	   then
+		  libcurl_ok='yes'
+	   else
+		  libcurl_ok='no'
+	   fi
+
+	   dnl First test the minimum
+	   if test $libcurl_ok = "no"
+	   then
+		  AC_MSG_ERROR([must have libcurl 7.10.6 or greater, found $version_libcurl])
+	   fi
+
+	   CURL_LIBS="`curl-config --libs`"
+	   CURL_STATIC_LIBS=$CURL_LIBS
+	   curlprivatelibs="`curl-config --libs`"
+	   CURL_CFLAGS="`curl-config --cflags`"
+	   AC_MSG_RESULT([yes; used curl-config])
+    else
+	   AC_MSG_ERROR([I could not find libcurl])
+    fi
+fi
+
 AC_SUBST([curlprivatereq])
 AC_SUBST([curlprivatelibs])
 AC_SUBST([CURL_LIBS])
 AC_SUBST([CURL_STATIC_LIBS])
 AC_SUBST([CURL_CFLAGS])
 
+AC_ARG_WITH(xml2,[  --with-xml2=PFX   Prefix where libxml2 is installed (optional). This will override pkgconfig, etc.],
+            with_xml2_prefix="$withval", with_xml2_prefix="")
+
 xmlprivatereq=
 xmlprivatelibs=
+xml_set=
+
+if test -n "$with_xml2_prefix" -a -x $with_xml2_prefix/bin/xml2-config
+then
+    AC_MSG_NOTICE([Using $with_xml2_prefix as the libxml2 prefix directory.])
+    XML2_LIBS="`$with_xml2_prefix/bin/xml2-config --libs`"
+    XML2_STATIC_LIBS=$XML2_LIBS
+    xmlprivatelibs="`$with_xml2_prefix/bin/xml2-config --libs`"
+    XML2_CFLAGS="`$with_xml2_prefix/bin/xml2-config --cflags`"
+    xml_set="yes"
+elif test -n "$with_xml2_prefix"
+then
+    AC_MSG_ERROR([You set the libxml2 prefix directory to $with_xml2_prefix, but xml2-config is not there.])
+fi
+
+if test -z "$xml_set"
+then
 libdap_pkgconfig_libxml2=yes
 libdap_libxml2_module='libxml-2.0 >= 2.6.16'
 PKG_CHECK_MODULES([XML2],[$libdap_libxml2_module],,
@@ -245,6 +289,8 @@ then
 else
 	AC_MSG_ERROR([I could not find libxml2 2.6.16 or newer])
 fi
+fi
+
 AC_SUBST([xmlprivatereq])
 AC_SUBST([xmlprivatelibs])
 AC_SUBST([XML2_LIBS])

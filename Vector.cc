@@ -150,7 +150,7 @@ Vector::is_cardinal_type() const
  * If _buf already exists, this DELETES IT and creates a new one.
  * So don't use this if you want to keep the original _buf data around.
  * This also sets the valueCapacity().
- * @param numElts the number of elements of the cardinal type in var()
+ * @param numEltsOfType the number of elements of the cardinal type in var()
                   that we want storage for.
  * @return the size of the buffer created.
  * @exception if the Vector's type is not cardinal type.
@@ -723,10 +723,6 @@ bool Vector::serialize(ConstraintEvaluator & eval, DDS & dds,
 
 bool Vector::deserialize(UnMarshaller &um, DDS * dds, bool reuse)
 {
-#if 0
-    // status no longer used. jhrg 8/28/07
-    bool status;
-#endif
     unsigned int num;
     unsigned i = 0;
 
@@ -1098,32 +1094,38 @@ Vector::reserve_value_capacity(unsigned int numElements)
      case dods_int32_c:
      case dods_uint32_c:
      case dods_float32_c:
-     case dods_float64_c:
-       // Make _buf be the right size and set _capacity
-       create_cardinal_data_buffer_for_type(numElements);
+     case dods_float64_c: {
+         // Make _buf be the right size and set _capacity
+         create_cardinal_data_buffer_for_type(numElements);
+       }
        break;
 
      case dods_str_c:
-     case dods_url_c:
-       // Make sure the d_str has enough room for all the strings.
-       // Technically not needed, but it will speed things up for large arrays.
-       d_str.reserve(numElements);
-       _capacity = numElements;
+     case dods_url_c: {
+         // Make sure the d_str has enough room for all the strings.
+         // Technically not needed, but it will speed things up for large arrays.
+         d_str.reserve(numElements);
+         _capacity = numElements;
+       }
        break;
+
 
      case dods_array_c:
      case dods_structure_c:
      case dods_sequence_c:
-     case dods_grid_c:
-       // not clear anyone will go this path, but best to be complete.
-       _vec.reserve(numElements);
-       _capacity = numElements;
-       break;
+     case dods_grid_c: {
+         // not clear anyone will go this path, but best to be complete.
+         _vec.reserve(numElements);
+         _capacity = numElements;
+       }
+      break;
 
-     default:
+     default: {
          throw InternalErr(__FILE__, __LINE__, "reserve_value_capacity: Unknown type!");
-         break;
-     }
+       }
+     break;
+
+  } // switch
 
 }
 
@@ -1159,7 +1161,7 @@ Vector::reserve_value_capacity()
  * ASSUMES: the data type of this->var() and rowMajorData.var()
  *          MUST be non-NULL and be the same!
  *
- * @param rowMajorData the vector from which to copy data,
+ * @param rowMajorDataC the vector from which to copy data,
  *                     assumed already read in or set.
  * @param startElement the element index
  *                     (NOT byte, but rather data type element)
@@ -1215,7 +1217,7 @@ Vector::set_value_slice_from_row_major_vector(const Vector& rowMajorDataC, unsig
       case dods_int32_c:
       case dods_uint32_c:
       case dods_float32_c:
-      case dods_float64_c:
+      case dods_float64_c: {
         if (!_buf) {
           throw InternalErr(__FILE__, __LINE__, funcName + "Logic error: this->_buf was unexpectedly null!");
         }
@@ -1223,36 +1225,45 @@ Vector::set_value_slice_from_row_major_vector(const Vector& rowMajorDataC, unsig
           throw InternalErr(__FILE__, __LINE__, funcName + "Logic error: rowMajorData._buf was unexpectedly null!");
         }
         // memcpy the data into this, taking care to do ptr arithmetic on bytes and not sizeof(element)
-        memcpy(_buf + (startElement * _var->width()),
-               rowMajorData._buf,
-               rowMajorData.width() );
-        break;
+        int varWidth = _var->width();
+        char* pFromBuf = rowMajorData._buf;
+        int numBytesToCopy = rowMajorData.width();
+        char* pIntoBuf = _buf + (startElement * varWidth);
+        memcpy(pIntoBuf,
+               pFromBuf,
+               numBytesToCopy );
+      }
+      break;
 
       case dods_str_c:
-      case dods_url_c:
+      case dods_url_c: {
         // Strings need to be copied directly
         for (unsigned int i = 0; i < static_cast<unsigned int>(rowMajorData.length()); ++i) {
           d_str[startElement + i] = rowMajorData.d_str[i];
         }
-        break;
+      }
+      break;
 
       case dods_array_c:
       case dods_structure_c:
       case dods_sequence_c:
-      case dods_grid_c:
+      case dods_grid_c: {
         // Not sure that this function will be used for these type of nested objects, so I will throw here.
         // TODO impl and test this path if it's ever needed.
         throw InternalErr(__FILE__, __LINE__,
             funcName + "Unimplemented method for Vectors of type: dods_array_c, dods_structure_c, dods_sequence_c and dods_grid_c.");
-        break;
+      }
+      break;
 
-      default:
+      default: {
         throw InternalErr(__FILE__, __LINE__, funcName + ": Unknown type!");
-        break;
+      }
+      break;
+
   } // switch (_var->type())
 
   // This is how many elements we copied.
-  return rowMajorData.length();
+  return (unsigned int)rowMajorData.length();
 }
 
 //@{

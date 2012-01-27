@@ -96,7 +96,7 @@ protected:
 
 public:
     HTTPCacheTest() : http_conn(0) {
-	putenv("DODS_CONF=./cache-testsuite/dodsrc");
+	putenv((char*)"DODS_CONF=./cache-testsuite/dodsrc");
 	http_conn = new HTTPConnect(RCReader::instance());
 
 	DBG2(cerr << "Entring HTTPCacheTest ctor... ");
@@ -308,11 +308,13 @@ public:
 	}
 
 	void set_cache_root_test() {
-		putenv("DODS_CACHE=/home/jimg");
+#if 0
+	    // env var support removed 3/22/11 jhrg
+	    putenv("DODS_CACHE=/home/jimg");
 		hc->set_cache_root();
 		CPPUNIT_ASSERT(hc->d_cache_root == "/home/jimg/dods-cache/");
 		remove("/home/jimg/w3c-cache/");
-
+#endif
 		hc->set_cache_root("/home/jimg/test_cache");
 		CPPUNIT_ASSERT(hc->d_cache_root == "/home/jimg/test_cache/");
 		remove("/home/jimg/test_cache/");
@@ -787,11 +789,11 @@ public:
 
 	void cache_gc_test() {
 		string fnoc1 =
-				"http://test.opendap.org/opendap/nph-dods/data/nc/fnoc1.nc.dds";
+				"http://test.opendap.org/dap/data/nc/fnoc1.nc.dds";
 		string fnoc2 =
-				"http://test.opendap.org/opendap/nph-dods/data/nc/fnoc2.nc.dds";
+				"http://test.opendap.org/dap/data/nc/fnoc2.nc.dds";
 		string fnoc3 =
-				"http://test.opendap.org/opendap/nph-dods/data/nc/fnoc3.nc.dds";
+				"http://test.opendap.org/dap/data/nc/fnoc3.nc.dds";
 		try {
 			auto_ptr<HTTPCache> pc(new HTTPCache("cache-testsuite/purge_cache", true));
 

@@ -61,12 +61,11 @@ Array::_duplicate(const Array &a)
 // in which case that means they want the whole thing. Array projection
 // should probably work this way too, but it doesn't. 9/21/2001 jhrg
 
-/** @deprecated Calling this method should never be necessary. It is called
-    whenever the size of the Array is changed.
+/** @deprecated Calling this method should never be necessary. It is used
+    internally called whenever the size of the Array is changed, e.g., by a
+    constraint.
 
-    Changes the size property of the array.  If the array
-    exists, it is augmented by a factor of <tt>size</tt>. This does
-    not change the actual size of the array.
+    Changes the length property of the array.
 */
 void
 Array::update_length(int)
@@ -219,6 +218,32 @@ Array::append_dim(int size, string name)
     _shape.push_back(d);
 
     update_length(size);
+}
+
+/** Creates a new OUTER dimension (slowest varying in rowmajor)
+ * for the array by prepending rather than appending it.
+ * @param size cardinality of the new dimension
+ * @param name  optional name for the new dimension
+ */
+void
+Array::prepend_dim(int size, const string& name/* = "" */)
+{
+  dimension d;
+
+  // This is invariant
+  d.size = size;
+  d.name = www2id(name);
+
+  // this information changes with each constraint expression
+  d.start = 0;
+  d.stop = size - 1;
+  d.stride = 1;
+  d.c_size = size;
+
+  // Shifts the whole array, but it's tiny in general
+  _shape.insert(_shape.begin(), d);
+
+  update_length(size); // the number is ignored...
 }
 
 /** Resets the dimension constraint information so that the entire
@@ -471,7 +496,30 @@ Array::dimension_name(Dim_iter i)
                            "*This* array has no dimensions.");
     return (*i).name;
 }
-//#if FILE_METHODS
+
+/** Returns the number of bytes needed to hold the array.
+
+    @brief Returns the width of the data, in bytes. */
+unsigned int Array::width(bool constrained)
+{
+
+	if (constrained) {
+		// This preserves the original method's semantics when we ask for the
+		// size of the constrained array but no constraint has been applied.
+		// In this case, length will be -1. Wrong, I know...
+		return length() * var()->width(constrained);
+	}
+	else {
+		int length = 1;
+		for (Dim_iter i = _shape.begin(); i != _shape.end(); i++) {
+			length *= dimension_size(i, false);
+		}
+		return length * var()->width(false);
+	}
+}
+
+
+#if FILE_METHODS
 /** Prints a declaration for the Array.  This is what appears in a
     DDS.  If the Array is constrained, the declaration will reflect
     the size of the Array once the constraint is applied.
@@ -516,7 +564,8 @@ Array::print_decl(FILE *out, string space, bool print_semi,
         fprintf(out, ";\n") ;
     }
 }
-//#endif
+#endif
+
 /** Prints a declaration for the Array.  This is what appears in a
     DDS.  If the Array is constrained, the declaration will reflect
     the size of the Array once the constraint is applied.
@@ -561,31 +610,31 @@ Array::print_decl(ostream &out, string space, bool print_semi,
 	out << ";\n" ;
     }
 }
-//#if FILE_METHODS
+#if FILE_METHODS
 void
 Array::print_xml(FILE *out, string space, bool constrained)
 {
     print_xml_core(out, space, constrained, "Array");
 }
-//#endif
+#endif
 void
 Array::print_xml(ostream &out, string space, bool constrained)
 {
     print_xml_core(out, space, constrained, "Array");
 }
-//#if FILE_METHODS
+#if FILE_METHODS
 void
 Array::print_as_map_xml(FILE *out, string space, bool constrained)
 {
     print_xml_core(out, space, constrained, "Map");
 }
-//#endif
+#endif
 void
 Array::print_as_map_xml(ostream &out, string space, bool constrained)
 {
     print_xml_core(out, space, constrained, "Map");
 }
-//#if FILE_METHODS
+#if FILE_METHODS
 class PrintArrayDim : public unary_function<Array::dimension&, void>
 {
     FILE *d_out;
@@ -632,7 +681,8 @@ Array::print_xml_core(FILE *out, string space, bool constrained, string tag)
 
     fprintf(out, "%s</%s>\n", space.c_str(), tag.c_str());
 }
-//#endif
+#endif
+
 class PrintArrayDimStrm : public unary_function<Array::dimension&, void>
 {
     ostream &d_out;
@@ -678,15 +728,17 @@ Array::print_xml_core(ostream &out, string space, bool constrained, string tag)
 
     out << space << "</" << tag << ">\n" ;
 }
-//#if FILE_METHODS
+
+#if FILE_METHODS
 /** Prints the values in ASCII of the entire (constrained) array. This method
     Attempts to make an aesthetically pleasing display. However, it is
     primarily intended for debugging purposes.
 
     @param out Write the output to this FILE *.
-    @param space The space to use in printing.
-    @param print_decl_p A boolean value indicating whether you want
-    the Array declaration to precede the Array value.
+    @param index
+    @param dims
+    @param shape
+
     @brief Print the value given the current constraint.
 */
 unsigned int
@@ -722,15 +774,17 @@ Array::print_array(FILE *out, unsigned int index, unsigned int dims,
         return index;
     }
 }
-//#endif
+#endif
+
 /** Prints the values in ASCII of the entire (constrained) array. This method
     Attempts to make an anesthetically pleasing display. However, it is
     primarily intended for debugging purposes.
 
     @param out Write the output to this ostream
-    @param space The space to use in printing.
-    @param print_decl_p A boolean value indicating whether you want
-    the Array declaration to precede the Array value.
+    @param index
+    @param dims
+    @param shape
+
     @brief Print the value given the current constraint.
 */
 unsigned int
@@ -766,7 +820,8 @@ Array::print_array(ostream &out, unsigned int index, unsigned int dims,
         return index;
     }
 }
-//#if FILE_METHODS
+
+#if FILE_METHODS
 void
 Array::print_val(FILE *out, string space, bool print_decl_p)
 {
@@ -794,7 +849,8 @@ Array::print_val(FILE *out, string space, bool print_decl_p)
         fprintf(out, ";\n") ;
     }
 }
-//#endif
+#endif
+
 void
 Array::print_val(ostream &out, string space, bool print_decl_p)
 {

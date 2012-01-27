@@ -32,6 +32,8 @@
 
 #include "config.h"
 
+//#define DODS_DEBUG
+
 static char rcsid[]not_used =
         "$Id$";
 
@@ -120,27 +122,43 @@ AttrType String_to_AttrType(const string &s)
 void AttrTable::clone(const AttrTable &at)
 {
     d_name = at.d_name;
+    d_is_global_attribute = at.d_is_global_attribute;
+
+    // Set the parent to null (no parent, not in container)
+    // since using at.d_parent is semantically incorrect
+    // and potentially dangerous.
+    d_parent = 0;
 
     Attr_citer i = at.attr_map.begin();
     Attr_citer ie = at.attr_map.end();
-    for (; i != ie; i++) {
+    for (; i != ie; ++i) {
+        // this deep-copies containers recursively
         entry *e = new entry(*(*i));
         attr_map.push_back(e);
-    }
 
-    d_parent = at.d_parent;
+        // If the entry being added was a container,
+        // set its parent to this to maintain invariant.
+        if (e->type == Attr_container) {
+          assert(e->attributes);
+          e->attributes->d_parent = this;
+        }
+    }
 }
 
 /** @name Instance management functions */
 
 //@{
-AttrTable::AttrTable() :
-    d_name(""), d_parent(0)
+AttrTable::AttrTable()
+  : DapObj()
+  , d_name("")
+  , d_parent(0)
+  , attr_map()
+  , d_is_global_attribute(true)
 {
 }
 
-AttrTable::AttrTable(const AttrTable &rhs) :
-    DapObj()
+AttrTable::AttrTable(const AttrTable &rhs)
+: DapObj()
 {
     clone(rhs);
 }
@@ -148,10 +166,11 @@ AttrTable::AttrTable(const AttrTable &rhs) :
 // Private
 void AttrTable::delete_attr_table()
 {
-    for (Attr_iter i = attr_map.begin(); i != attr_map.end(); i++) {
+    for (Attr_iter i = attr_map.begin(); i != attr_map.end(); ++i) {
         delete *i;
         *i = 0;
     }
+    attr_map.clear();
 }
 
 AttrTable::~AttrTable()
@@ -215,11 +234,12 @@ AttrTable::set_name(const string &n)
  @return Returns the length of the added attribute value.
  @param name The name of the attribute to add or modify.
  @param type The type of the attribute to add or modify.
- @param attribute The value to add to the attribute table. */
+ @param value The value to add to the attribute table. */
 unsigned int
 AttrTable::append_attr(const string &name, const string &type,
-        const string &attribute)
+        const string &value)
 {
+    DBG(cerr << "Entering AttrTable::append_attr" << endl);
     string lname = www2id(name);
 
     Attr_iter iter = simple_find(lname);
@@ -234,7 +254,7 @@ AttrTable::append_attr(const string &name, const string &type,
             + string("' already exists but is a container."));
 
     if (iter != attr_map.end()) { // Must be a new attribute value; add it.
-        (*iter)->attr->push_back(attribute);
+        (*iter)->attr->push_back(value);
         return (*iter)->attr->size();
     }
     else { // Must be a completely new attribute; add it
@@ -244,7 +264,7 @@ AttrTable::append_attr(const string &name, const string &type,
         e->is_alias = false;
         e->type = String_to_AttrType(type); // Record type using standard names.
         e->attr = new vector<string>;
-        e->attr->push_back(attribute);
+        e->attr->push_back(value);
 
         attr_map.push_back(e);
 
@@ -274,6 +294,7 @@ unsigned int
 AttrTable::append_attr(const string &name, const string &type,
         vector<string> *values)
 {
+    DBG(cerr << "Entering AttrTable::append_attr(..., vector)" << endl);
     string lname = www2id(name);
 
     Attr_iter iter = simple_find(lname);
@@ -310,9 +331,10 @@ AttrTable::append_attr(const string &name, const string &type,
 
 /** Create and append an attribute container to this AttrTable. If this
  attribute table already contains an attribute container called
- <tt>name</tt> an exception is thrown.
+ <tt>name</tt> an exception is thrown. Return a pointer to the new container.
 
  @brief Add a container to the attribute table.
+ @param name The name of the container to create.
  @return A pointer to the new AttrTable object.
  */
 
@@ -327,7 +349,7 @@ AttrTable::append_container(const string &name)
     catch (Error &e) {
         // an error occurred, attribute with that name already exists
         delete new_at; new_at = 0;
-        throw e;
+        throw ;
     }
     return ret;
 }
@@ -342,6 +364,8 @@ AttrTable::append_container(const string &name)
  set_name() method.
 
  @brief Add a container to the attribute table.
+ @param at A pointer to the new attribute table to append.
+ @param name The name of the new attribute table.
  @return A pointer to the new AttrTable object.
  */
 AttrTable *
@@ -351,7 +375,7 @@ AttrTable::append_container(AttrTable *at, const string &name)
 
     if (simple_find(name) != attr_end())
     throw Error(string("There already exists a container called `")
-            + name + string("' in this attribute table."));
+            + name + string("' in this attribute table. (1)"));
     DBG(cerr << "Setting appended attribute container name to: "
             << lname << endl);
     at->set_name(lname);
@@ -400,13 +424,6 @@ AttrTable::find(const string &target, AttrTable **at, Attr_iter *iter)
         }
     }
     else {
-#if 0
-        // Replaced this call to simple_find with the call to recursive_find
-        // so that older code that assumes that attribute names will not need
-        // to be FQNs works. jhrg 2/9/06
-        *at = this;
-        *iter = simple_find(target);
-#endif
         *at = recurrsive_find(target, iter);
     }
 }
@@ -456,7 +473,7 @@ AttrTable::Attr_iter
 AttrTable::simple_find(const string &target)
 {
     Attr_iter i;
-    for (i = attr_map.begin(); i != attr_map.end(); i++) {
+    for (i = attr_map.begin(); i != attr_map.end(); ++i) {
         if (target == (*i)->name) {
             break;
         }
@@ -500,7 +517,7 @@ AttrTable::simple_find_container(const string &target)
     if (get_name() == target)
     return this;
 
-    for (Attr_iter i = attr_map.begin(); i != attr_map.end(); i++) {
+    for (Attr_iter i = attr_map.begin(); i != attr_map.end(); ++i) {
         if (is_container(i) && target == (*i)->name) {
             return (*i)->attributes;
         }
@@ -806,6 +823,26 @@ AttrTable::get_attr_vector(Attr_iter iter)
     return (*iter)->type != Attr_container ? (*iter)->attr : 0;
 }
 
+bool
+AttrTable::is_global_attribute(Attr_iter iter)
+{
+    assert(iter != attr_map.end());
+    if ((*iter)->type == Attr_container)
+	return (*iter)->attributes->is_global_attribute();
+    else
+	return (*iter)->is_global;
+}
+
+void
+AttrTable::set_is_global_attribute(Attr_iter iter, bool ga)
+{
+    assert(iter != attr_map.end());
+    if ((*iter)->type == Attr_container)
+	(*iter)->attributes->set_is_global_attribute(ga);
+    else
+	(*iter)->is_global = ga;
+}
+
 //@} Accessors that use an iterator
 
 // Alias an attribute table. The alias should be added to this object.
@@ -821,7 +858,7 @@ AttrTable::add_container_alias(const string &name, AttrTable *src)
 
     if (simple_find(lname) != attr_end())
     throw Error(string("There already exists a container called `")
-            + name + string("in this attribute table."));
+            + name + string("in this attribute table. (2)"));
 
     entry *e = new entry;
     e->name = lname;
@@ -878,7 +915,7 @@ AttrTable::add_value_alias(AttrTable *das, const string &name,
 
     if (simple_find(lname) != attr_end())
     throw Error(string("There already exists a container called `")
-            + name + string("in this attribute table."));
+            + name + string("in this attribute table. (3)"));
 
     entry *e = new entry;
     e->name = lname;
@@ -938,7 +975,7 @@ AttrTable::attr_alias(const string &alias, const string &name)
 void
 AttrTable::erase()
 {
-    for (Attr_iter i = attr_map.begin(); i != attr_map.end(); i++) {
+    for (Attr_iter i = attr_map.begin(); i != attr_map.end(); ++i) {
         delete *i; *i = 0;
     }
 
@@ -1120,7 +1157,7 @@ AttrTable::simple_print(ostream &out, string pad, Attr_iter i,
 void
 AttrTable::print(FILE *out, string pad, bool dereference)
 {
-    for (Attr_iter i = attr_map.begin(); i != attr_map.end(); i++) {
+    for (Attr_iter i = attr_map.begin(); i != attr_map.end(); ++i) {
         if ((*i)->is_alias) {
             if (dereference) {
                 simple_print(out, pad, i, dereference);
@@ -1151,7 +1188,7 @@ AttrTable::print(FILE *out, string pad, bool dereference)
 void
 AttrTable::print(ostream &out, string pad, bool dereference)
 {
-    for (Attr_iter i = attr_map.begin(); i != attr_map.end(); i++) {
+    for (Attr_iter i = attr_map.begin(); i != attr_map.end(); ++i) {
         if ((*i)->is_alias) {
             if (dereference) {
                 simple_print(out, pad, i, dereference);
@@ -1175,7 +1212,7 @@ void
 AttrTable::print_xml(FILE *out, string pad, bool /*constrained*/)
 {
     // Why this works: AttrTable is really a hacked class that used to
-    // implement a single level, unnested, set of attributes. Containers
+    // implement a single-level set of attributes. Containers
     // were added several years later by dropping in the 'entry' structure.
     // It's not a class in its own right; instead accessors from AttrTable
     // are used to access information from entry. So... the loop below
@@ -1214,7 +1251,7 @@ AttrTable::print_xml(FILE *out, string pad, bool /*constrained*/)
             else {
                 for (unsigned j = 0; j < get_attr_num(i); ++j) {
                     fprintf(out, "%s<value>%s</value>\n", value_pad.c_str(),
-                            id2xml(get_attr(i, j)).c_str());
+                	    id2xml(get_attr(i, j)).c_str());
                 }
             }
             fprintf(out, "%s</Attribute>\n", pad.c_str());
@@ -1283,7 +1320,7 @@ AttrTable::dump(ostream &strm) const
         DapIndent::Indent();
         Attr_citer i = attr_map.begin();
         Attr_citer ie = attr_map.end();
-        for (; i != ie; i++) {
+        for (; i != ie; ++i) {
             entry *e = (*i);
             string type = AttrType_to_String(e->type);
             if (e->is_alias) {
@@ -1307,7 +1344,7 @@ AttrTable::dump(ostream &strm) const
                 strm << DapIndent::LMarg;
                 vector<string>::const_iterator iter = e->attr->begin();
                 vector<string>::const_iterator last = e->attr->end() - 1;
-                for (; iter != last; iter++) {
+                for (; iter != last; ++iter) {
                     strm << (*iter) << ", ";
                 }
                 strm << (*(e->attr->end() - 1)) << endl;

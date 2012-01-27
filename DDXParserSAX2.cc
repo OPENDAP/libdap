@@ -29,6 +29,7 @@
 //#define DODS_DEBUG2 1
 
 #include <cstring>
+#include <cstdarg>
 
 #include "BaseType.h"
 #include "Byte.h"
@@ -383,9 +384,11 @@ void DDXParser::process_dimension(const xmlChar **attrs, int nb_attributes)
     if (check_required_attribute(string("size"))) {
         set_state(inside_dimension);
         Array *ap = dynamic_cast < Array * >(bt_stack.top());
-		if (!ap)
+		if (!ap) {
 			ddx_fatal_error(this, "Parse error: Expected an array variable.");
-
+			return;
+		}
+		
         ap->append_dim(atoi(attribute_table["size"].value.c_str()),
                        attribute_table["name"].value);
     }
@@ -514,7 +517,7 @@ void DDXParser::finish_variable(const char *tag, Type t, const char *expected)
 /** Initialize the SAX parser state object. This object is passed to each
     callback as a void pointer. The initial state is parser_start.
 
-    @param parser The SAX parser  */
+    @param p The SAX parser  */
 void DDXParser::ddx_start_document(void * p)
 {
     DDXParser *parser = static_cast<DDXParser*>(p);
@@ -535,7 +538,7 @@ void DDXParser::ddx_start_document(void * p)
 }
 
 /** Clean up after finishing a parse.
-    @param parser The SAX parser  */
+    @param p The SAX parser  */
 void DDXParser::ddx_end_document(void * p)
 {
     DDXParser *parser = static_cast<DDXParser*>(p);
@@ -554,9 +557,11 @@ void DDXParser::ddx_end_document(void * p)
     // Pop the temporary Structure off the stack and transfer its variables
     // to the DDS.
     Constructor *cp = dynamic_cast < Constructor * >(parser->bt_stack.top());
-    if (!cp)
+    if (!cp) {
     	ddx_fatal_error(parser, "Parse error: Expected a Structure, Sequence or Grid variable.");
-
+		return;
+    }
+    
     for (Constructor::Vars_iter i = cp->var_begin(); i != cp->var_end();
          ++i)
         parser->dds->add_var(*i);
@@ -586,8 +591,8 @@ void DDXParser::ddx_sax2_start_element(void *p,
             if (parser->check_required_attribute(string("name")))
                 parser->dds->set_dataset_name(parser->attribute_table["name"].value);
 
-            if (parser->check_attribute("dap_version"))
-                parser->dds->set_dap_version(parser->attribute_table["dap_version"].value);
+            if (parser->check_attribute("dapVersion"))
+                parser->dds->set_dap_version(parser->attribute_table["dapVersion"].value);
         }
         else
             DDXParser::ddx_fatal_error(parser,
@@ -1050,7 +1055,7 @@ xmlEntityPtr DDXParser::ddx_get_entity(void *, const xmlChar * name)
     typically no way to tell a user about the error since there's often no
     user interface for this software.
 
-    @param parser The SAX parser
+    @param p The SAX parser
     @param msg A printf-style format string. */
 void DDXParser::ddx_fatal_error(void * p, const char *msg, ...)
 {
@@ -1071,45 +1076,6 @@ void DDXParser::ddx_fatal_error(void * p, const char *msg, ...)
 }
 
 //@}
-#if 0
-/** This local variable holds pointers to the callback <i>functions</i> which
-    comprise the SAX parser. */
-static xmlSAXHandler ddx_sax_parser =
-    {
-        0,                          // internalSubset
-        0,                          // isStandalone
-        0,                          // hasInternalSubset
-        0,                          // hasExternalSubset
-        0,                          // resolveEntity
-        (getEntitySAXFunc) DDXParser::ddx_get_entity,       // getEntity
-        0,                          // entityDecl
-        0,                          // notationDecl
-        0,                          // attributeDecl
-        0,                          // elementDecl
-        0,                          // unparsedEntityDecl
-        0,                          // setDocumentLocator
-        (startDocumentSAXFunc) DDXParser::ddx_start_document,       // startDocument
-        (endDocumentSAXFunc) DDXParser::ddx_end_document,   // endDocument
-        (startElementSAXFunc) 0, //DDXParser::ddx_start_element, // startElement
-        (endElementSAXFunc) 0, //DDXParser::ddx_end_element,     // endElement
-        0,                          // reference
-        (charactersSAXFunc) DDXParser::ddx_get_characters,
-        (ignorableWhitespaceSAXFunc) DDXParser::ddx_ignoreable_whitespace, // ignorableWhitespace
-        0,                          // processingInstruction
-        0,                          // (commentSAXFunc)gladeComment,  comment
-        (warningSAXFunc) DDXParser::ddx_fatal_error,        // warning
-        (errorSAXFunc) DDXParser::ddx_fatal_error,  // error
-        (fatalErrorSAXFunc) DDXParser::ddx_fatal_error,     // fatalError
-        0,                          // getParameterEntity
-        0,                          // cdataBlock
-        0,                          // externalSubset
-        XML_SAX2_MAGIC, // 0,                          // initialized
-        0,                          // _private
-        (startElementNsSAX2Func) DDXParser::ddx_sax2_start_element,  // startElementNs
-        (endElementNsSAX2Func) DDXParser::ddx_sax2_end_element,    // endElementNs
-        (xmlStructuredErrorFunc)0   // serror
-    };
-#endif
 
 void DDXParser::cleanup_parse(xmlParserCtxtPtr & context) const
 {
@@ -1182,12 +1148,10 @@ void DDXParser::intern_stream(FILE *in, DDS *dest_dds, string &cid,
         context->sax = &ddx_sax_parser;
         context->userData = this;
         context->validate = true;
-#if 0
-        while ((res = fread(chars, 1, size, in)) > 0) {
-            xmlParseChunk(ctxt, chars, res, 0);
-        }
-#endif
+
+
         while ((fgets(chars, size, in) > 0) && !is_boundary(chars, boundary)) {
+            chars[size-1] = '\0';
             DBG(cerr << "line: " << chars << endl);
             xmlParseChunk(ctxt, chars, strlen(chars), 0);
         }

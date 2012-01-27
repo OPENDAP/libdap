@@ -109,7 +109,7 @@ TestArray::operator=(const TestArray &rhs)
 
 /** Special names are ones that start with 'lat' or 'lon'. These indicate
     that the vector (this is only for vectors) is a vector of latitude or
-    longitude values. Only true for vectors.*/
+    longitude values. */
 bool
 TestArray::name_is_special()
 {
@@ -139,7 +139,7 @@ TestArray::build_special_values()
         int array_len = length();
         double *lon_data = new double[array_len];
         for (int i = 0; i < array_len; ++i) {
-            lon_data[i] = -179 + (360/array_len) * (i+1);
+            lon_data[i] = (360/array_len) * (i+1);
         }
         libdap::set_array_using_double(this, lon_data, array_len);
     }
@@ -217,9 +217,12 @@ TestArray::constrained_matrix(char *constrained_array)
     DBG(cerr << "constrained size: " << constrained_size << endl);
     DBG(cerr << "constrained_array: ";
         for (int i = 0; i < constrained_size; ++i) {
-    	cerr << (int)*(dods_byte*)(constrained_array + (i * elem_width)) << ", ";
+    	    cerr << (int)*(dods_byte*)(constrained_array + (i * elem_width)) << ", ";
         }
-    cerr << endl);
+        cerr << endl);
+
+    delete[] whole_array;
+    delete[] elem_val;
 }
 
 // This code calls 'output_values()' because print_val() does not test
@@ -267,11 +270,6 @@ TestArray::print_array(ostream &out, unsigned int index, unsigned int dims,
 void
 TestArray::output_values(std::ostream &out)
 {
-#if 0
-    // if a simple type, call print_val
-    print_val(out, "", false);
-    // if a constructor type, call var()->output_values
-#endif
     unsigned int *shape = new unsigned int[dimensions(true)];
     unsigned int index = 0;
     for (Dim_iter i = dim_begin(); i != dim_end() && index < dimensions(true); ++i)
@@ -302,7 +300,9 @@ TestArray::read()
       case dods_float32_c:
       case dods_float64_c: {
 
-        char *tmp = new char[width()];
+        //char *tmp = new char[width()];
+	vector<char> tmp(width());
+
         unsigned int elem_wid = var()->width(); // size of an element
         char *elem_val = 0;       // Null forces buf2val to allocate memory
 
@@ -313,17 +313,17 @@ TestArray::read()
                 build_special_values();
             }
             else if (dimensions() == 2) {
-                constrained_matrix(tmp);
-                val2buf(tmp);
+                constrained_matrix(&tmp[0]);
+                val2buf(&tmp[0]);
             }
             else {
                 for (unsigned i = 0; i < array_len; ++i) {
                     var()->read();
                     var()->buf2val((void **)&elem_val); // internal buffer to ELEM_VAL
-                    memcpy(tmp + i * elem_wid, elem_val, elem_wid);
+                    memcpy(&tmp[0] + i * elem_wid, elem_val, elem_wid);
                     var()->set_read_p(false); // pick up the next value
                  }
-                 val2buf(tmp);
+                 val2buf(&tmp[0]);
             }
         }
         else {
@@ -331,21 +331,22 @@ TestArray::read()
 	    var()->buf2val((void **)&elem_val);
 
 	    for (unsigned i = 0; i < array_len; ++i) {
-	        memcpy(tmp + i * elem_wid, elem_val, elem_wid);
+	        memcpy(&tmp[0] + i * elem_wid, elem_val, elem_wid);
             }
 
-            val2buf(tmp);
+            val2buf(&tmp[0]);
         }
 
 	delete elem_val; elem_val = 0; // alloced in buf2val()
-	delete[] tmp; tmp = 0;	// alloced above
+	// delete[] tmp; tmp = 0;	// alloced above
 
 	break;
       }
 
       case dods_str_c:
       case dods_url_c: {
-        char *tmp = new char[width()];
+        // char *tmp = new char[width()];
+        vector<char> tmp(width());
         unsigned int elem_wid = var()->width(); // size of an element
         char *elem_val = 0;       // Null forces buf2val to allocate memory
 
@@ -353,7 +354,7 @@ TestArray::read()
                 for (unsigned i = 0; i < array_len; ++i) {
                     var()->read();
                     var()->buf2val((void **)&elem_val); // internal buffer to ELEM_VAL
-                    memcpy(tmp + i * elem_wid, elem_val, elem_wid);
+                    memcpy(&tmp[0] + i * elem_wid, elem_val, elem_wid);
                     var()->set_read_p(false); // pick up the next value
                  }
         }
@@ -362,21 +363,19 @@ TestArray::read()
             var()->buf2val((void **)&elem_val);
 
             for (unsigned i = 0; i < array_len; ++i) {
-                memcpy(tmp + i * elem_wid, elem_val, elem_wid);
+                memcpy(&tmp[0] + i * elem_wid, elem_val, elem_wid);
             }
         }
 
-        val2buf(tmp);
+        val2buf(&tmp[0]);
 
         delete elem_val; elem_val = 0; // alloced in buf2val()
-        delete[] tmp; tmp = 0;  // alloced above
+        // delete[] tmp; tmp = 0;  // alloced above
 
         break;
       }
 
       case dods_structure_c:
-      case dods_sequence_c:
-      case dods_grid_c:
 
 	// Arrays of Structure, ... must load each element into the array
 	// manually. Because these are stored as C++/DODS objects, there is
@@ -405,6 +404,8 @@ TestArray::read()
 
 	break;
 
+      case dods_sequence_c:
+      case dods_grid_c:
       case dods_array_c:
       case dods_null_c:
       default:

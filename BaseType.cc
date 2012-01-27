@@ -79,7 +79,7 @@ namespace libdap {
 void
 BaseType::_duplicate(const BaseType &bt)
 {
-    DBG(cerr << "BaseType::_duplicate: " << bt._name << " send_p: "
+    DBG2(cerr << "BaseType::_duplicate: " << bt._name << " send_p: "
             << bt._send_p << endl);
     _name = bt._name;
     _type = bt._type;
@@ -138,8 +138,8 @@ BaseType::BaseType(const BaseType &copy_from) : DapObj()
 
 BaseType::~BaseType()
 {
-    DBG(cerr << "Entering ~BaseType (" << this << ")" << endl);
-    DBG(cerr << "Exiting ~BaseType" << endl);
+    DBG2(cerr << "Entering ~BaseType (" << this << ")" << endl);
+    DBG2(cerr << "Exiting ~BaseType" << endl);
 }
 
 BaseType &
@@ -483,7 +483,7 @@ void
 BaseType::set_read_p(bool state)
 {
     if (! _synthesized_p) {
-        DBG(cerr << "Changing read_p state of " << name() << " to "
+        DBG2(cerr << "Changing read_p state of " << name() << " to "
 	         << state << endl);
         _read_p = state;
     }
@@ -516,7 +516,7 @@ BaseType::send_p()
 void
 BaseType::set_send_p(bool state)
 {
-    DBG(cerr << "Calling BaseType::set_send_p() for: " << this->name()
+    DBG2(cerr << "Calling BaseType::set_send_p() for: " << this->name()
         << endl);
     _send_p = state;
 }
@@ -539,6 +539,55 @@ void
 BaseType::set_attr_table(const AttrTable &at)
 {
     d_attr = at;
+}
+
+/**
+ * Transfer attributes from a DAS object into this variable. Because of the
+ * rough history of the DAS object and the way that various server code built
+ * the DAS, this is necessarily a heuristic process. The intent is that this
+ * method will be overridden by handlers that need to look for certain patterns
+ * in the DAS (e.g., hdf4's odd variable_dim_n; where n = 0, 1, 2, ...)
+ * attribute containers.
+ *
+ * There should be a one-to-one
+ * mapping between variables and attribute containers. However, in some cases
+ * one variable has attributes spread across several top level containers and
+ * in some cases one container is used by several variables
+ *
+ * @note This method is technically \e unnecessary because a server (or
+ * client) can easily add attributes directly using the DDS::get_attr_table
+ * or BaseType::get_attr_table methods and then poke values in using any
+ * of the methods AttrTable provides. This method exists to ease the
+ * transition to DDS objects which contain attribute information for the
+ * existing servers (Since they all make DAS objects separately from the
+ * DDS). They could be modified to use the same AttrTable methods but
+ * operate on the AttrTable instances in a DDS/BaseType instead of those in
+ * a DAS.
+  *
+ * @param at_container Transfer attributes from this container.
+ * @return void
+ */
+void BaseType::transfer_attributes(AttrTable *at_container) {
+	AttrTable *at = at_container->get_attr_table(name());
+
+	DBG(cerr << "In BaseType::transfer_attributes; processing " << name() << endl);
+
+	if (at) {
+		at->set_is_global_attribute(false);
+		DBG(cerr << "Processing AttrTable: " << at->get_name() << endl);
+
+		AttrTable::Attr_iter at_p = at->attr_begin();
+		while (at_p != at->attr_end()) {
+			DBG(cerr << "About to append " << "attr name, type:" << at->get_name(at_p) << ", " << at->get_type(at_p) << endl);
+
+			if (at->get_attr_type(at_p) == Attr_container)
+				get_attr_table().append_container(new AttrTable(*at->get_attr_table(at_p)), at->get_name(at_p));
+			else
+				get_attr_table().append_attr(at->get_name(at_p), at->get_type(at_p), at->get_attr_vector(at_p));
+
+			at_p++;
+		}
+	}
 }
 
 /** Does this variable appear in either the selection part or as a function
@@ -745,13 +794,14 @@ void
 BaseType::intern_data(ConstraintEvaluator &, DDS &dds)
 {
     dds.timeout_on();
-    DBG(cerr << "BaseType::intern_data: " << name() << endl);
+    DBG2(cerr << "BaseType::intern_data: " << name() << endl);
     if (!read_p())
         read();          // read() throws Error and InternalErr
 
     dds.timeout_off();
 }
-//#if FILE_METHODS
+
+#if FILE_METHODS
 /** Write the variable's declaration in a C-style syntax. This
     function is used to create textual representation of the Data
     Descriptor Structure (DDS).  See <i>The DODS User Manual</i> for
@@ -816,7 +866,8 @@ BaseType::print_decl(FILE *out, string space, bool print_semi,
     if (print_semi)
         fprintf(out, ";\n") ;
 }
-//#endif
+#endif
+
 /** Write the variable's declaration in a C-style syntax. This
     function is used to create textual representation of the Data
     Descriptor Structure (DDS).  See <i>The DODS User Manual</i> for
@@ -880,7 +931,8 @@ BaseType::print_decl(ostream &out, string space, bool print_semi,
     if (print_semi)
 	out << ";\n" ;
 }
-//#if FILE_METHODS
+
+#if FILE_METHODS
 /** Write the XML representation of this variable. This method is used to
     build the DDX XML response.
     @param out Destination.
@@ -907,7 +959,8 @@ BaseType::print_xml(FILE *out, string space, bool constrained)
         fprintf(out, "/>\n"); // no attributes; just close tag.
     }
 }
-//#endif
+#endif
+
 /** Write the XML representation of this variable. This method is used to
     build the DDX XML response.
     @param out Destination output stream
@@ -1027,6 +1080,21 @@ BaseType::ops(BaseType *, int)
     // however any of the child classes could by mistake call BaseType::ops
     // so this is an internal error. Jose Garcia
     throw InternalErr(__FILE__, __LINE__, "Unimplemented operator.");
+}
+
+/** This version of width simply returns the same thing as width() for simple
+    types and Arrays. For Constructors, it needs to be specialized. This is
+    partly due to an inconsistency in the way Vector::width() is implemented.
+    That method uses the constrained size of the array (while the Constructor
+    versions do not take the constraint into account).
+
+    @param constrained If true, return the size after applying a constraint.
+    @return  The number of bytes used by the variable.
+ */
+unsigned int
+BaseType::width(bool /*constrained*/)
+{
+	return width();
 }
 
 } // namespace libdap

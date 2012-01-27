@@ -48,6 +48,8 @@
 #include "Vector.h"
 #endif
 
+#define FILE_METHODS 1
+
 namespace libdap
 {
 
@@ -127,10 +129,10 @@ private:
 protected:
     void _duplicate(const Array &a);
 
-    //#if FILE_METHODS
+#if FILE_METHODS
     unsigned int print_array(FILE *out, unsigned int index,
                              unsigned int dims, unsigned int shape[]);
-    //#endif
+#endif
     unsigned int print_array(ostream &out, unsigned int index,
                              unsigned int dims, unsigned int shape[]);
 
@@ -159,14 +161,16 @@ public:
 
     void add_var(BaseType *v, Part p = nil);
 
-    void update_length(int size);
-
     void append_dim(int size, string name = "");
+    void prepend_dim(int size, const string& name = "");
 
     virtual void add_constraint(Dim_iter i, int start, int stride, int stop);
     virtual void reset_constraint();
 
     virtual void clear_constraint();
+
+    virtual void update_length(int size);
+    virtual unsigned int width(bool constrained = true);
 
     Dim_iter dim_begin() ;
     Dim_iter dim_end() ;
@@ -187,9 +191,9 @@ public:
     virtual void print_xml(ostream &out, string space = "    ",
                            bool constrained = false);
 
-    //#if FILE_METHODS
+#if FILE_METHODS
     virtual void print_xml_core(FILE *out, string space, bool constrained, string tag);
-    //#endif
+#endif
     virtual void print_xml_core(ostream &out, string space, bool constrained, string tag);
 
     // not used (?)
@@ -199,7 +203,7 @@ public:
     virtual void print_val(ostream &out, string space = "",
                            bool print_decl_p = true);
 
-    //#if FILE_METHODS
+#if FILE_METHODS
     virtual void print_xml(FILE *out, string space = "    ",
                            bool constrained = false);
     virtual void print_as_map_xml(FILE *out, string space = "    ",
@@ -210,7 +214,7 @@ public:
                             bool print_semi = true,
                             bool constraint_info = false,
                             bool constrained = false);
-    //#endif
+#endif
 
     virtual bool check_semantics(string &msg, bool all = false);
 

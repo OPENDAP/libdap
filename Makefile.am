@@ -26,6 +26,7 @@ TEST_COV_FLAGS = -ftest-coverage -fprofile-arcs
 SUBDIRS = gl . tests unit-tests
 DIST_SUBDIRS = unit-tests gl tests
 
+noinst_LTLIBRARIES = libparsers.la
 lib_LTLIBRARIES = libdap.la libdapclient.la libdapserver.la
 
 bin_SCRIPTS = dap-config dap-config-pkgconfig
@@ -34,19 +35,19 @@ bin_PROGRAMS = getdap
 
 BUILT_SOURCES = $(GRAM_SRC) dods-datatypes.h xdr-datatypes.h
 
+libparsers_la_SOURCES = $(GRAM_SRC) 
+
 libdap_la_SOURCES = $(DAP_SRC) $(GNU_SRC) 
-
-libdapclient_la_SOURCES = $(CLIENT_SRC) 
-libdapserver_la_SOURCES = $(SERVER_SRC)
-
 libdap_la_LDFLAGS = -version-info $(LIBDAP_VERSION)
 libdap_la_CPPFLAGS = $(AM_CPPFLAGS) $(XML2_CFLAGS)
-libdap_la_LIBADD = $(XML2_LIBS) $(PTHREAD_LIBS) gl/libgnu.la
+libdap_la_LIBADD = $(XML2_LIBS) $(PTHREAD_LIBS) gl/libgnu.la libparsers.la
 
+libdapclient_la_SOURCES = $(CLIENT_SRC) 
 libdapclient_la_LDFLAGS = -version-info $(CLIENTLIB_VERSION)
 libdapclient_la_CPPFLAGS = $(AM_CPPFLAGS) $(CURL_CFLAGS) $(XML2_CFLAGS)
 libdapclient_la_LIBADD = $(CURL_LIBS) libdap.la $(PTHREAD_LIBS)
 
+libdapserver_la_SOURCES = $(SERVER_SRC)
 libdapserver_la_LDFLAGS = -version-info $(SERVERLIB_VERSION)
 libdapserver_la_LIBADD = libdap.la $(UUID_LIBS)
 
@@ -54,7 +55,7 @@ pkginclude_HEADERS = $(DAP_HDR) $(GNU_HDR) $(CLIENT_HDR) $(SERVER_HDR)
 noinst_HEADERS = config_dap.h $(GRIDFIELD_HDR)
 
 getdap_SOURCES = getdap.cc
-getdap_LDADD = libdapclient.la libdap.la libdapserver.la
+getdap_LDADD = libdapclient.la libdap.la
 getdap_CPPFLAGS = $(AM_CPPFLAGS) $(CURL_CFLAGS)
 
 LEX_YACC_EXTRA = das.lex das.y dds.lex dds.y ce_expr.lex ce_expr.y gse.lex \
@@ -70,6 +71,11 @@ pkgconfig_DATA = libdap.pc libdapclient.pc libdapserver.pc
 
 CLEANFILES = *.log *.output *.gcda *.gcno $(GRAM_SRC) dods-datatypes.h xdr-datatypes.h
 
+# Not nearly as clean as it could be, but this removes .svn directories
+# in subdirs.
+dist-hook:
+	rm -rf `find $(distdir) -name .svn`
+
 # MAINTAINERCLEANFILES = $(GRAM_SRC)
 
 # Copy the generated grammar files to the 'grammarfiles' directory.
@@ -82,16 +88,23 @@ docs:
 	doxygen $(srcdir)/doxy.conf
 	(cd docs && tar -czf html.tar.gz html)
 
+# cccc computes metrics like Lines of code and McCabe. It'a available
+# on the web...
+.PHONY: cccc
+cccc:
+	-mkdir cccc
+	cccc --outdir=cccc $(DAP_SRC) $(SERVER_SRC) $(CLIENT_SRC) \
+	$(DAP_HDR) $(SERVER_HDR) $(CLIENT_HDR)
+
 ###########################################################################
 
 # Fortify targets.
-
+# dods-datatypes.h xdr-datatypes.h
 .PHONY: fortify
-fortify: dods-datatypes.h xdr-datatypes.h
+fortify: $(BUILT_SOURCES)
 	(cd gl && sourceanalyzer -b @PACKAGE@-gl $(MAKE) )
-	$(MAKE) $(grammar_objects)
-	sourceanalyzer -b @PACKAGE@ $(MAKE) libdap.la libdapserver.la
-	sourceanalyzer -b @PACKAGE@-gl -scan -f @PACKAGE@-gl-@PACKAGE_VERSION@.fpr
+	sourceanalyzer -b @PACKAGE@-parsers $(MAKE) libparsers.la
+	sourceanalyzer -b @PACKAGE@ $(MAKE) libdap.la libdapserver.la libdapclient.la
 	sourceanalyzer -b @PACKAGE@ -scan -f @PACKAGE@-@PACKAGE_VERSION@.fpr
 
 # run fortify on only our code, not the gnulib code or the flex/bison code.
@@ -100,8 +113,8 @@ fortify: dods-datatypes.h xdr-datatypes.h
 .PHONY: fortify-lite
 fortify-lite: dods-datatypes.h xdr-datatypes.h
 	( cd gl && $(MAKE) )
-	$(MAKE) $(grammar_objects)
-	sourceanalyzer -b @PACKAGE@ $(MAKE) libdap.la libdapserver.la
+	$(MAKE) libparsers.la
+	sourceanalyzer -b @PACKAGE@ $(MAKE) libdap.la libdapserver.la libdapclient.la
 	sourceanalyzer -b @PACKAGE@ -scan -f @PACKAGE@-@PACKAGE_VERSION@.fpr
 
 grammar_objects = lex.das.o das.tab.o lex.dds.o dds.tab.o lex.ce_expr.o \
@@ -115,13 +128,14 @@ fortifyclean:
 
 ###########################################################################
 
-# Build linux RPMs
+# Build linux RPMs. Use the environment variable 'RPM_OPTIONS' to pass in
+# extra options like --nodeps and --macros
 
 srpm: dist
-	rpmbuild -ts @PACKAGE@-@PACKAGE_VERSION@.tar.gz
+	rpmbuild -ts --clean $(RPM_OPTIONS) @PACKAGE@-@PACKAGE_VERSION@.tar.gz
 
 rpm: dist
-	rpmbuild -tb @PACKAGE@-@PACKAGE_VERSION@.tar.gz
+	rpmbuild -tb --clean $(RPM_OPTIONS) @PACKAGE@-@PACKAGE_VERSION@.tar.gz
 
 ###########################################################################
 
@@ -129,45 +143,42 @@ rpm: dist
 # are there so that the values built into dap-config will match the mac
 # osx install dirs and not the temp directory used to build the packages
 
-PACKAGEMAKER=/Developer/Applications/Utilities/PackageMaker.app/Contents/MacOS/PackageMaker*
+# PACKAGEMAKER=/Developer/Applications/Utilities/PackageMaker.app/Contents/MacOS/PackageMaker*
 
-UNIV_ARCH=-arch ppc -arch i386
-MAC_SYSROOT=Developer/SDKs/MacOSX10.4u.sdk
-
+PACKAGEMAKER=/Developer/usr/bin/packagemaker
 PKG_CONF_FLAGS=
-#CXXFLAGS="$(CXXFLAGS) $(UNIV_ARCH) -isysroot /$(MAC_SYSROOT)" \
-#CFLAGS="$(CFLAGS) $(UNIV_ARCH) -isysroot /$(MAC_SYSROOT)" \
-#LDFLAGS="$(LDFLAGS) $(UNIV_ARCH) -Wl,-syslibroot,/$(MAC_SYSROOT)"
-
-# LDFLAGS="$(LDFLAGS) $(UNIV_ARCH) -Wl,-syslibroot,$(MAC_SYSROOT)"
 
 clean-pkg:
 	-rm -rf mac_osx @PACKAGE@-@PACKAGE_VERSION@.pkg
 
-pkg-build:
-	./configure --prefix=/usr --disable-dependency-tracking $(PKG_CONF_FLAGS)
+pkg-build: clean-pkg
+	./configure --prefix=$(prefix) --disable-dependency-tracking $(PKG_CONF_FLAGS)
 	make clean all
-	DESTDIR=${PWD}/mac_osx make install
+	DESTDIR=`pwd`/mac_osx make install
 
-pkg-main:
-	./OSX_Resources/update_mac_package_contents.pl README "configure.ac" "mac_osx/usr"
-	${PACKAGEMAKER} -build -p @PACKAGE@-@PACKAGE_VERSION@.pkg \
-		-f mac_osx/usr \
-		-ds -r OSX_Resources \
-		-i OSX_Resources/Info.plist \
-		-d OSX_Resources/Description.plist
-	-rm -rf mac_osx
+pkg-main: pkg-build
+	./OSX_Resources/update_mac_package_contents.pl README
+	cat ./OSX_Resources/Info.plist.proto | \
+	   sed -e "s^_PREFIX_^$(prefix)^g" \
+	       -e "s^_FULL_VERSION_^@PACKAGE_VERSION@^g" \
+	       -e "s^_MAJOR_VERSION_^@PACKAGE_MAJOR_VERSION@^g" \
+	       -e "s^_MINOR_VERSION_^@PACKAGE_MINOR_VERSION@^g" \
+	       > foo
+	mv foo ./OSX_Resources/Info.plist
+	${PACKAGEMAKER} --root mac_osx --id org.opendap.@PACKAGE@ \
+	    --title "@PACKAGE@ @PACKAGE_VERSION@" --version @PACKAGE_VERSION@ \
+	    --out @PACKAGE@-@PACKAGE_VERSION@.pkg --resources OSX_Resources
 
-pkg-dmg:
+pkg-dmg: pkg-main
 	-rm -rf @PACKAGE@-@PACKAGE_VERSION@
 	-rm -rf @PACKAGE@-@PACKAGE_VERSION@.dmg
 	mkdir @PACKAGE@-@PACKAGE_VERSION@
-	mv @PACKAGE@-@PACKAGE_VERSION@.pkg @PACKAGE@-@PACKAGE_VERSION@
+	cp -r @PACKAGE@-@PACKAGE_VERSION@.pkg @PACKAGE@-@PACKAGE_VERSION@
 	cp README README.* NEWS @PACKAGE@-@PACKAGE_VERSION@
 	dropdmg -i --sanitize-for-servers --format zlib @PACKAGE@-@PACKAGE_VERSION@
 	-rm -rf @PACKAGE@-@PACKAGE_VERSION@
 
-pkg: clean-pkg pkg-build pkg-main pkg-dmg
+pkg: pkg-main 
 
 # Note that the gcov options -f and -b are useful but sometimes make looking
 # at the results of coverage analysis a little taxing. -b reports on all
@@ -190,17 +201,11 @@ GNU_SRC = GNU/GetOpt.cc GNU/GNURegex.cc
 
 GNU_HDR = GNU/GetOpt.h GNU/GNURegex.h
 
-# XSTREAM_SRC = xstream/posix.cpp xstream/fd.cpp xstream/common.cpp
-
-# XSTREAM_HDR = xstream/posix.h xstream/fd.h xstream/common.h 
-
-GRAM_SRC = lex.das.cc das.tab.cc das.tab.hh \
-	lex.dds.cc dds.tab.cc dds.tab.hh \
-	lex.ce_expr.cc ce_expr.tab.cc ce_expr.tab.hh \
-	lex.Error.cc Error.tab.cc Error.tab.hh gse.tab.hh gse.tab.cc \
+GRAM_SRC = lex.das.cc das.tab.cc das.tab.hh lex.dds.cc dds.tab.cc	\
+	dds.tab.hh lex.ce_expr.cc ce_expr.tab.cc ce_expr.tab.hh		\
+	lex.Error.cc Error.tab.cc Error.tab.hh gse.tab.hh gse.tab.cc	\
 	lex.gse_.cc
 
-GFDIR = gridfields/
 GRIDFIELD_SRC = gridfields/apply.cc      gridfields/gridfield.cc \
 gridfields/array.cc      gridfields/gridfieldoperator.cc \
 gridfields/cellarray.cc  gridfields/implicit0cells.cc \
@@ -229,45 +234,40 @@ gridfields/idordmap.h		gridfields/crossordmap.h \
 gridfields/fparser.hh		gridfields/fpconfig.hh \
 gridfields/fptypes.hh		gridfields/sift.h
 
-DAP_SRC = AttrTable.cc DAS.cc DDS.cc DataDDS.cc DDXParserSAX2.cc BaseType.cc \
-	Byte.cc Int32.cc Float64.cc Str.cc Url.cc Vector.cc Array.cc	 \
-	Structure.cc Sequence.cc Grid.cc UInt32.cc Int16.cc UInt16.cc	 \
-	Float32.cc Constructor.cc					 \
-	BaseTypeFactory.cc SignalHandler.cc Error.cc InternalErr.cc	 \
-	util.cc xdrutil_ppc.c parser-util.cc escaping.cc		 \
-	$(GRAM_SRC) ce_functions.cc GSEClause.cc \
-	GeoConstraint.cc GridGeoConstraint.cc \
-	Clause.cc RValue.cc ConstraintEvaluator.cc ArrayGeoConstraint.cc \
-	DapIndent.cc Operators.h					 \
-        $(GRIDFIELD_SRC) \
-	XDRUtils.cc XDRFileMarshaller.cc XDRFileUnMarshaller.cc		 \
-	XDRStreamMarshaller.cc XDRStreamUnMarshaller.cc mime_util.cc 
+DAP_SRC = AttrTable.cc DAS.cc DDS.cc DataDDS.cc DDXParserSAX2.cc	\
+	BaseType.cc Byte.cc Int32.cc Float64.cc Str.cc Url.cc		\
+	Vector.cc Array.cc Structure.cc Sequence.cc Grid.cc UInt32.cc	\
+	Int16.cc UInt16.cc Float32.cc Constructor.cc			\
+	BaseTypeFactory.cc SignalHandler.cc Error.cc InternalErr.cc	\
+	util.cc xdrutil_ppc.c parser-util.cc escaping.cc		\
+	ce_functions.cc GSEClause.cc GeoConstraint.cc			\
+	GridGeoConstraint.cc Clause.cc RValue.cc			\
+	ConstraintEvaluator.cc ArrayGeoConstraint.cc DapIndent.cc	\
+	Operators.h XDRUtils.cc XDRFileMarshaller.cc			\
+	XDRFileUnMarshaller.cc XDRStreamMarshaller.cc			\
+	XDRStreamUnMarshaller.cc mime_util.cc Keywords2.cc $(GRIDFIELD_SRC)
 
 Operators.h: ce_expr.tab.hh
 
 # Operators.h is included in with the source to prevent it from bing installed
 # with the other headers. It includes one of the built grammar file headers.
 
-CLIENT_SRC = RCReader.cc Connect.cc HTTPConnect.cc HTTPCache.cc		\
-	util_mit.cc ResponseTooBigErr.cc HTTPCacheTable.cc fdiostream.cc
+CLIENT_SRC = RCReader.cc Connect.cc HTTPConnect.cc HTTPCache.cc	\
+	util_mit.cc ResponseTooBigErr.cc HTTPCacheTable.cc
 
-SERVER_SRC = DODSFilter.cc Ancillary.cc
-
-DAP_HDR = AttrTable.h DAS.h DDS.h DataDDS.h DDXParserSAX2.h DDXExceptions.h	\
-	BaseType.h Byte.h Int32.h Float64.h Str.h Url.h Vector.h Array.h   \
-	Constructor.h Structure.h Sequence.h Grid.h UInt32.h Int16.h	   \
-	UInt16.h Float32.h						   \
-	BaseTypeFactory.h ObjectType.h EncodingType.h \
-	SignalHandler.h Error.h InternalErr.h		   \
-	util.h escaping.h parser.h debug.h dods-limits.h dods-datatypes.h \
-	GeoConstraint.h GridGeoConstraint.h ArrayGeoConstraint.h	  \
-	ce_functions.h  gse_parser.h GSEClause.h util_mit.h		  \
-	$(GRIDFIELD_HDR)		  \
-	expr.h Clause.h RValue.h ConstraintEvaluator.h ce_parser.h	  \
-	DapIndent.h DapObj.h XDRFileMarshaller.h Marshaller.h		  \
-	XDRFileUnMarshaller.h UnMarshaller.h XDRStreamMarshaller.h	  \
-	XDRUtils.h xdr-datatypes.h mime_util.h cgi_util.h                 \
-	XDRStreamUnMarshaller.h 
+DAP_HDR = AttrTable.h DAS.h DDS.h DataDDS.h DDXParserSAX2.h		\
+	DDXExceptions.h BaseType.h Byte.h Int32.h Float64.h Str.h	\
+	Url.h Vector.h Array.h Constructor.h Structure.h Sequence.h	\
+	Grid.h UInt32.h Int16.h UInt16.h Float32.h BaseTypeFactory.h	\
+	ObjectType.h EncodingType.h SignalHandler.h Error.h		\
+	InternalErr.h util.h escaping.h parser.h debug.h dods-limits.h	\
+	dods-datatypes.h GeoConstraint.h GridGeoConstraint.h		\
+	ArrayGeoConstraint.h ce_functions.h gse_parser.h GSEClause.h	\
+	util_mit.h expr.h Clause.h RValue.h ConstraintEvaluator.h	\
+	ce_parser.h DapIndent.h DapObj.h XDRFileMarshaller.h		\
+	Marshaller.h XDRFileUnMarshaller.h UnMarshaller.h		\
+	XDRStreamMarshaller.h XDRUtils.h xdr-datatypes.h mime_util.h	\
+	cgi_util.h XDRStreamUnMarshaller.h Keywords2.h	$(GRIDFIELD_HDR)
 
 if USE_C99_TYPES
 dods-datatypes.h: dods-datatypes-static.h
@@ -276,28 +276,17 @@ dods-datatypes.h: dods-datatypes-config.h
 endif
 	cp -p $< dods-datatypes.h
 
-# I think that we should not be using a static header for the xdr
-# types - this is breaking on many platforms because although the c99
-# headers are present other type names are used for the xdr
-# types. jhrg 6/25/08
-
-# if USE_C99_TYPES
-# xdr-datatypes.h: xdr-datatypes-static.h
-#else
-#endif
-
 xdr-datatypes.h: xdr-datatypes-config.h
 	cp -p $< xdr-datatypes.h
 
-CLIENT_HDR = RCReader.h Connect.h HTTPConnect.h HTTPCache.h		 \
-	HTTPCacheDisconnectedMode.h HTTPCacheInterruptHandler.h		 \
-	Response.h HTTPResponse.h HTTPCacheResponse.h  PipeResponse.h	 \
-	StdinResponse.h SignalHandlerRegisteredErr.h ResponseTooBigErr.h \
-	Resource.h HTTPCacheTable.h fdiostream.h
+CLIENT_HDR = RCReader.h Connect.h HTTPConnect.h HTTPCache.h		\
+	HTTPCacheDisconnectedMode.h HTTPCacheInterruptHandler.h		\
+	Response.h HTTPResponse.h HTTPCacheResponse.h PipeResponse.h	\
+	StdinResponse.h SignalHandlerRegisteredErr.h			\
+	ResponseTooBigErr.h Resource.h HTTPCacheTable.h
 
-# AISConnect.h AISMerge.h AISExceptions.h AISDatabaseParser.h AISResources.h 	
-
-SERVER_HDR = DODSFilter.h AlarmHandler.h EventHandler.h Ancillary.h
+SERVER_HDR = DODSFilter.h AlarmHandler.h EventHandler.h Ancillary.h	\
+	ResponseBuilder.h
 
 ############################################################################
 # Special rules for the grammars. I tried to use the automake grammar support

@@ -67,6 +67,8 @@
 #include "Marshaller.h"
 #include "UnMarshaller.h"
 
+#define FILE_METHODS 1
+
 using namespace std;
 
 namespace libdap
@@ -264,6 +266,8 @@ public:
     virtual void set_parent(BaseType *parent);
     virtual BaseType *get_parent();
 
+    virtual void transfer_attributes(AttrTable *at);
+
     // I put this comment here because the version in BaseType.cc does not
     // include the exact_match or s variables since they are not used. Doxygen
     // was gaging on the comment.
@@ -309,21 +313,20 @@ public:
     virtual bool check_semantics(string &msg, bool all = false);
 
     virtual bool ops(BaseType *b, int op);
-    //#if FILE_METHODS
+#if FILE_METHODS
     virtual void print_decl(FILE *out, string space = "    ",
                             bool print_semi = true,
                             bool constraint_info = false,
                             bool constrained = false);
-    //#endif
+
+    virtual void print_xml(FILE *out, string space = "    ",
+                           bool constrained = false);
+#endif
     virtual void print_decl(ostream &out, string space = "    ",
                             bool print_semi = true,
                             bool constraint_info = false,
                             bool constrained = false);
 
-    //#if FILE_METHODS
-    virtual void print_xml(FILE *out, string space = "    ",
-                           bool constrained = false);
-    //#endif
     virtual void print_xml(ostream &out, string space = "    ",
                            bool constrained = false);
 
@@ -342,6 +345,7 @@ public:
 
 	@brief Returns the size of the class instance data. */
     virtual unsigned int width() = 0;
+    virtual unsigned int width(bool constrained);
 
     /** Reads the class data into the memory referenced by <i>val</i>.
 	The caller should either allocate enough storage to <i>val</i>
@@ -417,7 +421,7 @@ public:
 
 	This function is only used on the server side of the
 	client/server connection, and is generally only called from
-	the DODSFilter::send() function. It has no BaseType
+	the ResponseBuilder functions. It has no BaseType
 	implementation; each datatype child class supplies its own
 	implementation.
 
@@ -466,7 +470,7 @@ public:
 	@see DDS */
     virtual bool deserialize(UnMarshaller &um, DDS *dds, bool reuse = false) = 0;
 
-    //#if FILE_METHODS
+#if FILE_METHODS
     /** Prints the value of the variable, with its declaration. This
 	function is primarily intended for debugging DODS
 	applications. However, it can be overloaded and used to do
@@ -484,7 +488,7 @@ public:
 
     virtual void print_val(FILE *out, string space = "",
                            bool print_decl_p = true) = 0;
-    //#endif
+#endif
 
     /** Prints the value of the variable, with its declaration. This
 	function is primarily intended for debugging DODS

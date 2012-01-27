@@ -510,6 +510,31 @@ Sequence::width()
     return sz;
 }
 
+/** This version of width simply returns the same thing as width() for simple
+    types and Arrays. For Sequence it returns the total row size if constrained
+    is false, or the size of the row elements in the current projection if true.
+
+    @param constrained If true, return the size after applying a constraint.
+    @return  The number of bytes used by the variable.
+ */
+unsigned int
+Sequence::width(bool constrained)
+{
+    unsigned int sz = 0;
+
+    for (Vars_iter i = _vars.begin(); i != _vars.end(); i++) {
+    	if (constrained) {
+    		if ((*i)->send_p())
+    			sz += (*i)->width(constrained);
+    	}
+    	else {
+    		sz += (*i)->width(constrained);
+    	}
+    }
+
+    return sz;
+}
+
 // This version returns -1. Each API-specific subclass should define a more
 // reasonable version. jhrg 5/24/96
 
@@ -1048,8 +1073,10 @@ Sequence::intern_data_parent_part_two(DDS &dds,
             }
             else if ((*iter)->send_p()) { //Sequence; must be the last variable
                 Sequence *tmp = dynamic_cast<Sequence*>((*iter)->ptr_duplicate());
-                if (!tmp)
+                if (!tmp) {
+                	delete row_data;
                     throw InternalErr(__FILE__, __LINE__, "Expected a Sequence.");
+                }
                 row_data->push_back(tmp);
                 DBG2(cerr << "    pushing d_values of " << tmp->name()
 		     << " (" << &(tmp->d_values)
@@ -1285,7 +1312,8 @@ Sequence::buf2val(void **)
     throw InternalErr(__FILE__, __LINE__, "Use Sequence::var_value() or Sequence::row_value() in place of Sequence::buf2val()");
     return sizeof(Sequence);
 }
-//#if FILE_METHODS
+
+#if FILE_METHODS
 void
 Sequence::print_one_row(FILE *out, int row, string space,
                         bool print_row_num)
@@ -1323,7 +1351,8 @@ Sequence::print_one_row(FILE *out, int row, string space,
 
     fprintf(out, " }") ;
 }
-//#endif
+#endif
+
 void
 Sequence::print_one_row(ostream &out, int row, string space,
                         bool print_row_num)
@@ -1367,39 +1396,10 @@ Sequence::print_one_row(ostream &out, int row, string space,
         }
     }
 
-#if 0
-    // old version
-    int elements = element_count() - 1;
-    int j;
-    BaseType *bt_ptr;
-    // Print first N-1 elements of the row.
-    for (j = 0; j < elements; ++j) {
-        bt_ptr = var_value(row, j);
-        if (bt_ptr) {  // data
-            if (bt_ptr->type() == dods_sequence_c)
-                dynamic_cast<Sequence*>(bt_ptr)->print_val_by_rows
-                     (out, space + "    ", false, print_row_num);
-            else
-                bt_ptr->print_val(out, space, false);
-	    out << ", " ;
-        }
-    }
-
-    // Print Nth element; end with a `}.'
-    bt_ptr = var_value(row, j);
-    if (bt_ptr) {  // data
-        if (bt_ptr->type() == dods_sequence_c)
-            dynamic_cast<Sequence*>(bt_ptr)->print_val_by_rows
-            (out, space + "    ", false, print_row_num);
-        else
-            bt_ptr->print_val(out, space, false);
-    }
-#endif
-
     out << " }" ;
 }
 
-//#if FILE_METHODS
+#if FILE_METHODS
 void
 Sequence::print_val_by_rows(FILE *out, string space, bool print_decl_p,
                             bool print_row_numbers)
@@ -1424,7 +1424,8 @@ Sequence::print_val_by_rows(FILE *out, string space, bool print_decl_p,
     if (print_decl_p)
         fprintf(out, ";\n") ;
 }
-//#endif
+#endif
+
 void
 Sequence::print_val_by_rows(ostream &out, string space, bool print_decl_p,
                             bool print_row_numbers)
@@ -1449,13 +1450,15 @@ Sequence::print_val_by_rows(ostream &out, string space, bool print_decl_p,
     if (print_decl_p)
 	out << ";\n" ;
 }
-//#if FILE_METHODS
+
+#if FILE_METHODS
 void
 Sequence::print_val(FILE *out, string space, bool print_decl_p)
 {
     print_val_by_rows(out, space, print_decl_p, false);
 }
-//#endif
+#endif
+
 void
 Sequence::print_val(ostream &out, string space, bool print_decl_p)
 {

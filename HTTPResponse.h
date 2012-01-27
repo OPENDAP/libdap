@@ -47,6 +47,7 @@ namespace libdap
 {
 
 extern int dods_keep_temps; // defined in HTTPConnect.cc
+
 extern void close_temp(FILE *s, const string &name);
 
 /** Encapsulate an http response. Instead of directly returning the FILE
@@ -58,6 +59,8 @@ extern void close_temp(FILE *s, const string &name);
 class HTTPResponse : public Response
 {
 private:
+    // TODO Make this a value, not a pointer. Fix all uses and then
+    // change code in HTTPConnect
     vector<string> *d_headers; // Response headers
     string d_file;  // Temp file that holds response body
 
@@ -133,6 +136,11 @@ public:
     virtual void set_headers(vector<string> *h)
     {
         d_headers = h;
+    }
+
+    virtual void set_file(const string &n)
+    {
+	d_file = n;
     }
     //@}
 };

@@ -43,7 +43,6 @@
 #endif
 
 #include <vector>
-//#include "Pix.h"
 
 #ifndef _basetype_h
 #include "BaseType.h"
@@ -61,8 +60,7 @@
 #include "ConstraintEvaluator.h"
 #endif
 
-// FIXME
-//#include "XDRUtils.h"
+#define FILE_METHODS 1
 
 namespace libdap
 {
@@ -127,6 +125,7 @@ public:
     virtual void set_leaf_sequence(int level = 1);
 
     virtual unsigned int width();
+    virtual unsigned int width(bool constrained);
 
     virtual void intern_data(ConstraintEvaluator &eval, DDS &dds);
     virtual bool serialize(ConstraintEvaluator &eval, DDS &dds,
@@ -148,10 +147,10 @@ public:
     virtual void del_var(const string &name);
 
     virtual bool read() ;
-    //#if FILE_METHODS
+#if FILE_METHODS
     virtual void print_val(FILE *out, string space = "",
                            bool print_decl_p = true);
-    //#endif
+#endif
     virtual void print_val(ostream &out, string space = "",
                            bool print_decl_p = true);
 

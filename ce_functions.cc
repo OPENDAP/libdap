@@ -494,7 +494,11 @@ double extract_double_value(BaseType * arg)
 }
 
 /** This server-side function returns version information for the server-side
- functions. */
+ functions. Note that this function takes no arguments and returns a
+ String using the BaseType value/result parameter.
+
+ @param btpp A pointer to the return value; caller must delete.
+*/
 void
 function_version(int, BaseType *[], DDS &, BaseType **btpp)
 {
@@ -502,19 +506,36 @@ function_version(int, BaseType *[], DDS &, BaseType **btpp)
             xml_value =
                     "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
                        <functions>\
-                       <function name=\"version\" version=\"1.0\"/>\
+                       <function name=\"geogrid\" version=\"1.2\"/>\
                        <function name=\"grid\" version=\"1.0\"/>\
-                       <function name=\"geogrid\" version=\"1.0b2\"/>\
-                       <function name=\"geoarray\" version=\"0.9b1\"/>\
                        <function name=\"linear_scale\" version=\"1.0b1\"/>\
                        <function name=\"ugrid_demo\" version=\"0.1\"/>\
                        </functions>";
+
+    //                        <function name=\"geoarray\" version=\"0.9b1\"/>
 
     Str *response = new Str("version");
 
     response->set_value(xml_value);
     *btpp = response;
     return;
+}
+
+void
+function_dap(int, BaseType *[], DDS &, ConstraintEvaluator &)
+{
+#ifdef FUNCTION_DAP
+    if (argc != 1) {
+	throw Error("The 'dap' function must be called with a version number.\n\
+	see http://docs.opendap.org/index.php/Server_Side_Processing_Functions#dap");
+    }
+
+    double pv = extract_double_value(argv[0]);
+    dds.set_dap_version(pv);
+#else
+    throw Error("The 'dap' function is not supported in lieu of Constraint expression 'keywords.'\n\
+see http://docs.opendap.org/index.php/Server_Side_Processing_Functions#keywords");
+#endif
 }
 
 static void parse_gse_expression(gse_arg * arg, BaseType * expr)
@@ -610,8 +631,8 @@ static void apply_grid_selection_expressions(Grid * grid,
  @param argv An array of BaseType pointers which hold the arguments to be
  passed to geogrid. The arguments may be Strings, Integers, or Reals, subject
  to the above constraints.
- @param dds The DDS which holds the Grid.
- @param dataset Name of the dataset.
+ @param btpp A pointer to the return value; caller must delete.
+
  @see geogrid() (func_geogrid_select) A function which has logic specific
  to longitude/latitude selection. */
 void
@@ -621,24 +642,7 @@ function_grid(int argc, BaseType * argv[], DDS &, BaseType **btpp)
 
     string info =
     string("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n") +
-    "<function name=\"grid\" version=\"1.0\">\n" +
-    "The grid() function takes a grid variable and zero or more relational\n" +
-    "expressions. Each relational expression is applied to the grid using\n" +
-    "the server's constraint evaluator and the resulting grid is\n" +
-    "returned. The expressions may use constants and the grid's map vectors\n" +
-    "but may not use any other variables. In particular, you cannot use the\n" +
-    "grid values themselves.\n" +
-    "\n" +
-    "Two forms of expression are provided:\n" +
-    "\n" +
-    "  \"var relop const\"\n" +
-    "  \"const relop var relop const\".\n" +
-    "\n" +
-    "'relop' stands for one of the relational operators, like `=` and '>'\n" +
-    "\n" +
-    "For example: grid(sst, \"20>TIME>=10\") and \n" +
-    "grid(sst, \"20>TIME\",\"TIME>=10\") are both legal and, in this case,\n" +
-    "also equivalent.\n" +
+    "<function name=\"grid\" version=\"1.0\" href=\"http://docs.opendap.org/index.php/Server_Side_Processing_Functions#grid\">\n" +
     "</function>\n";
 
     if (argc == 0) {
@@ -652,12 +656,15 @@ function_grid(int argc, BaseType * argv[], DDS &, BaseType **btpp)
     if (!original_grid)
         throw Error(malformed_expr,"The first argument to grid() must be a Grid variable!");
 
-    // Duplicate the grid; DODSFilter::send_data() will delete the variable
+    // Duplicate the grid; ResponseBuilder::send_data() will delete the variable
     // after serializing it.
-    Grid *l_grid = dynamic_cast < Grid * >(original_grid->ptr_duplicate());
-    if (!l_grid)
+    BaseType *btp = original_grid->ptr_duplicate();
+    Grid *l_grid = dynamic_cast < Grid * >(btp);
+    if (!l_grid) {
+    	delete btp;
         throw InternalErr(__FILE__, __LINE__, "Expected a Grid.");
-
+    }
+    
     DBG(cerr << "grid: past initialization code" << endl);
 
     // Read the maps. Do this before calling parse_gse_expression(). Avoid
@@ -729,32 +736,15 @@ function_grid(int argc, BaseType * argv[], DDS &, BaseType **btpp)
  @param argv An array of BaseType pointers which hold the arguments to be
  passed to geogrid. The arguments may be Strings, Integers, or Reals,
  subject to the above constraints.
- @param dds The DDS which holds the Grid. This DDS \e must include
- attributes.
- @param dataset Name of the dataset.
+ @param btpp A pointer to the return value; caller must delete.
+
  @return The constrained and read Grid, ready to be sent. */
 void
 function_geogrid(int argc, BaseType * argv[], DDS &, BaseType **btpp)
 {
     string info =
     string("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n") +
-    "<function name=\"geogrid\" version=\"1.0b2\">\n" +
-    "The geogrid() function applies a constraint given in latitude and\n" +
-    "longitude to a DAP Grid variable. The arguments to the function are:\n" +
-    "\n" +
-    "  geogrid(variable, top, left, bottom, right, expressions)\n" +
-    "\n" +
-    "The variable is the data type to be returned.  Top, left, bottom,\n" +
-    "right are the coordinates of the northwesterm and southeastern corners\n" +
-    "of the selection box.  The expressions consist of one or more quoted\n" +
-    "relational expressions.  See grid() for more information about\n" +
-    "selection expressions.\n" +
-    "\n" +
-    "The function will always return a single Grid variable whose values\n" +
-    "completely cover the given region, although there may be cases when\n" +
-    "some additional data is also returned. If the longitude values 'wrap\n" +
-    "around' the right edge of the data, then the function will make two\n" +
-    "requests and return those joined together as a single Grid.\n" +
+    "<function name=\"geogrid\" version=\"1.2\" href=\"http://docs.opendap.org/index.php/Server_Side_Processing_Functions#geogrid\">\n"+
     "</function>";
 
     if (argc == 0) {
@@ -764,13 +754,40 @@ function_geogrid(int argc, BaseType * argv[], DDS &, BaseType **btpp)
         return ;
     }
 
-    if (argc < 5)
-        throw Error(malformed_expr,"Wrong number of arguments to geogrid(). See geogrid() for more information.");
+    // There are two main forms of this function, one that takes a Grid and one
+    // that takes a Grid and two Arrays. The latter provides a way to explicitly
+    // tell the function which maps contain lat and lon data. The remaining
+    // arguments are the same for both versions, although that includes a
+    // varying argument list.
 
+    // Look at the types of the first three arguments to determine which of the
+    // two forms were used to call this function.
+    Grid *l_grid = 0;
+    if (argc < 1 || !(l_grid = dynamic_cast < Grid * >(argv[0]->ptr_duplicate())))
+	throw Error(malformed_expr,"The first argument to geogrid() must be a Grid variable!");
+
+    // Both forms require at least this many args
+    if (argc < 5)
+        throw Error(malformed_expr,"Wrong number of arguments to geogrid() (expected at least 5 args). See geogrid() for more information.");
+
+    bool grid_lat_lon_form;
+    Array *l_lat = 0;
+    Array *l_lon = 0;
+    if (!(l_lat = dynamic_cast < Array * >(argv[1]))) //->ptr_duplicate())))
+	grid_lat_lon_form = false;
+    else if (!(l_lon = dynamic_cast < Array * >(argv[2]))) //->ptr_duplicate())))
+	throw Error(malformed_expr,"When using the Grid, Lat, Lon form of geogrid() both the lat and lon maps must be given (lon map missing)!");
+    else
+	grid_lat_lon_form = true;
+
+    if (grid_lat_lon_form && argc < 7)
+        throw Error(malformed_expr,"Wrong number of arguments to geogrid() (expected at least 7 args). See geogrid() for more information.");
+
+#if 0
     Grid *l_grid = dynamic_cast < Grid * >(argv[0]->ptr_duplicate());
     if (!l_grid)
         throw Error(malformed_expr,"The first argument to geogrid() must be a Grid variable!");
-
+#endif
     // Read the maps. Do this before calling parse_gse_expression(). Avoid
     // reading the array until the constraints have been applied because it
     // might be really large.
@@ -784,20 +801,23 @@ function_geogrid(int argc, BaseType * argv[], DDS &, BaseType **btpp)
     Grid::Map_iter i = l_grid->map_begin();
     while (i != l_grid->map_end())
         (*i++)->set_send_p(true);
+
     l_grid->read();
     // Calling read() above sets the read_p flag for the entire grid; clear it
     // for the grid's array so that later on the code will be sure to read it
     // under all circumstances.
-    l_grid->get_array()->set_read_p(false);DBG(cerr << "geogrid: past map read" << endl);
+    l_grid->get_array()->set_read_p(false);
+    DBG(cerr << "geogrid: past map read" << endl);
 
     // Look for Grid Selection Expressions tacked onto the end of the BB
     // specification. If there are any, evaluate them before evaluating the BB.
-    if (argc > 5) {
+    int min_arg_count = (grid_lat_lon_form) ? 7 : 5;
+    if (argc > min_arg_count) {
         // argv[5..n] holds strings; each are little Grid Selection Expressions
         // to be parsed and evaluated.
         vector < GSEClause * > clauses;
         gse_arg *arg = new gse_arg(l_grid);
-        for (int i = 5; i < argc; ++i) {
+        for (int i = min_arg_count; i < argc; ++i) {
             parse_gse_expression(arg, argv[i]);
             clauses.push_back(arg->get_gsec());
         }
@@ -814,11 +834,12 @@ function_geogrid(int argc, BaseType * argv[], DDS &, BaseType **btpp)
 
         // This sets the bounding box and modifies the maps to match the
         // notation of the box (0/359 or -180/179)
-        double top = extract_double_value(argv[1]);
-        double left = extract_double_value(argv[2]);
-        double bottom = extract_double_value(argv[3]);
-        double right = extract_double_value(argv[4]);
-        gc.set_bounding_box(left, top, right, bottom);
+        int box_index_offset = (grid_lat_lon_form) ? 3 : 1;
+        double top = extract_double_value(argv[box_index_offset]);
+        double left = extract_double_value(argv[box_index_offset + 1]);
+        double bottom = extract_double_value(argv[box_index_offset + 2]);
+        double right = extract_double_value(argv[box_index_offset + 3]);
+        gc.set_bounding_box(top, left, bottom, right);
         DBG(cerr << "geogrid: past bounding box set" << endl);
 
         // This also reads all of the data into the grid variable
@@ -871,11 +892,19 @@ static double string_to_double(const char *val)
 }
 
 /** Look for any one of a series of attribute values in the attribute table
- for \e var.
+ for \e var. This function treats the list of attributes as if they are ordered
+ from most to least likely/important. It stops when the first of the vector of
+ values is found. If the variable (var) is a Grid, this function also looks
+ at the Grid's Array for the named attributes. In all cases it returns the
+ first value found.
+ @param var Look for attributes in this BaseType variable.
+ @param attributes A vector of attributes; the first one found will be returned.
  @return The attribute value in a double. */
 static double get_attribute_double_value(BaseType *var,
         vector<string> &attributes)
 {
+    // This code also builds a list of the attribute values that have been
+    // passed in but not found so that an informative message can be returned.
     AttrTable &attr = var->get_attr_table();
     string attribute_value = "";
     string values = "";
@@ -888,12 +917,12 @@ static double get_attribute_double_value(BaseType *var,
     }
 
     // If the value string is empty, then look at the grid's array (if it's a
-    // grid or throw an Error.
+    // grid) or throw an Error.
     if (attribute_value.empty()) {
         if (var->type() == dods_grid_c)
             return get_attribute_double_value(dynamic_cast<Grid&>(*var).get_array(), attributes);
         else
-            throw Error(malformed_expr,string("No COARDS '") + values.substr(0, values.length() - 2)
+            throw Error(malformed_expr,string("No COARDS/CF '") + values.substr(0, values.length() - 2)
                     + "' attribute was found for the variable '"
                     + var->name() + "'.");
     }
@@ -942,10 +971,10 @@ static double get_missing_value(BaseType *var)
  constants 'm' and 'b' or the function will look for the COARDS attributes
  'scale_factor' and 'add_offset'.
 
- @param argc
- @param argv
- @param dds
- @param dataset
+ @param argc A count of the arguments 
+ @param argv An array of pointers to each argument, wrapped in a child of BaseType
+ @param btpp A pointer to the return value; caller must delete.
+
  @return The scaled variable, represented using Float64
  @exception Error Thrown if scale_factor is not given and the COARDS
  attributes cannot be found OR if the source variable is not a
@@ -955,31 +984,7 @@ function_linear_scale(int argc, BaseType * argv[], DDS &, BaseType **btpp)
 {
     string info =
     string("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n") +
-    "<function name=\"linear_scale\" version=\"1.0b1\">\n" +
-    "The linear_scale() function applies the familiar y=mx+b equation to\n" + 
-    "data. It has three forms:\n" +
-    "\n" +
-    "  linear_scale(var)\n" +
-    "\n" +
-    "If only the name of a variable is given, the function looks for the\n" + 
-    "COARDS scale_factor, add_offset and missing_value attributes in the\n" + 
-    "DAS. In the equation, 'm' is scale_factor, 'b' is add_offset and data\n" + 
-    "values that match missing_value are not scaled.\n" +  
-    "\n" +
-    "If add_offset cannot be found, it defaults to zero; if missing_value\n" +
-    "cannot be found, the test for it is not performed.\n" +
-    "\n" +
-    "You can also call this function like this:\n" +
-    "\n" +
-    "  linear_scale(var,scale_factor,add_offset)\n" +
-    "\n" +
-    "Or:\n" + 
-    "\n" +
-    "  linear_scale(var,scale_factor,add_offset,missing_value)\n" +
-    "\n" +
-    "If the given values conflict with the dataset's attributes, the given\n" +
-    "values override.  If the missing_value is missing, then the missing\n" +
-    "value test is not performed.\n" +
+    "<function name=\"linear_scale\" version=\"1.0b1\" href=\"http://docs.opendap.org/index.php/Server_Side_Processing_Functions#linear_scale\">\n" +
     "</function>";
 
     if (argc == 0) {
@@ -1109,6 +1114,7 @@ function_linear_scale(int argc, BaseType * argv[], DDS &, BaseType **btpp)
     return;
 }
 
+#if 0
 /** Perform a selection on the array using geographical coordinates. This
  function takes several groups of arguments.
  <ul>
@@ -1119,10 +1125,11 @@ function_linear_scale(int argc, BaseType * argv[], DDS &, BaseType **btpp)
 
  @note Only the plat-carre projection and wgs84 datum are currently
  supported.
- @param argc
- @param argv
- @param dds
- @param dataset
+
+ @param argc A count of the arguments 
+ @param argv An array of pointers to each argument, wrapped in a child of BaseType
+ @param btpp A pointer to the return value; caller must delete.
+
  @return The Array, constrained by the selection
  @exception Error Thrown if thins go awry. */
 void
@@ -1130,24 +1137,7 @@ function_geoarray(int argc, BaseType * argv[], DDS &, BaseType **btpp)
 {
     string info =
     string("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n") +
-    "<function name=\"geoarray\" version=\"0.9b1\">\n" +
-    "The geoarray() function supports two different sets of arguments:\n" +
-    "\n" +
-    "  geoarray(var,left,top,right,bottom)\n" +
-    "\n" +
-    "In the first version 'var' is the target of the selection and 'left',\n" +
-    "'top', 'right' and 'bottom' are the corners of a longitude-latitude\n" +
-    "box that defines the selection. The array's position on the globe is\n" + 
-    "defined by metadata that appears in the dataset's DAS.\n" +
-    "\n" +
-    "  geoarray(var,left,top,right,bottom,"+
-    "var_left,var_top,var_right,var_bottom)\n" +
-    "\n" +
-    "In the second version the array's position on the globe is specified\n" +
-    "explicitly in the function argument list.  The 'var_left','var_top',\n" + 
-    "and similar parameters give the longitude and latitude extent of the \n" + 
-    "entire array. The projection and datum are assumed to be Plat-Carre\n"+
-    "and WGS84.\n" +
+    "<function name=\"geoarray\" version=\"0.9b1\" href=\"http://docs.opendap.org/index.php/Server_Side_Processing_Functions#geoarray\">\n" +
     "</function>";
 
     if (argc == 0) {
@@ -1234,6 +1224,7 @@ function_geoarray(int argc, BaseType * argv[], DDS &, BaseType **btpp)
 
     throw InternalErr(__FILE__, __LINE__, "Impossible condition in geoarray.");
 }
+#endif
 
 
 
@@ -1475,8 +1466,12 @@ void register_functions(ConstraintEvaluator & ce)
     ce.add_function("grid", function_grid);
     ce.add_function("geogrid", function_geogrid);
     ce.add_function("linear_scale", function_linear_scale);
+#if 0
     ce.add_function("geoarray", function_geoarray);
+#endif
     ce.add_function("version", function_version);
+
+    ce.add_function("dap", function_dap);
 }
 
 } // namespace libdap

@@ -27,6 +27,14 @@
 
 #include <list>
 
+#ifndef _dds_h
+#include "DDS.h"
+#endif
+
+#ifndef _datadds_h
+#include "DataDDS.h"
+#endif
+
 #ifndef _clause_h
 #include "Clause.h"
 #endif
@@ -108,10 +116,15 @@ public:
     bool eval_selection(DDS &dds, const string &dataset);
     BaseType *eval_function(DDS &dds, const string &dataset);
 
+    // New for libdap 3.11. These methods provide a way to evaluate multiple
+    // functions in one CE
+    bool function_clauses();
+    DDS *eval_function_clauses(DDS &dds);
+    DataDDS *eval_function_clauses(DataDDS &dds);
 
     Clause_iter clause_begin();
     Clause_iter clause_end();
-    bool clause_value(Clause_iter &i, DDS &dds/*, const string &dataset***/);
+    bool clause_value(Clause_iter &i, DDS &dds);
 
     void parse_constraint(const string &constraint, DDS &dds);
     void append_constant(BaseType *btp);

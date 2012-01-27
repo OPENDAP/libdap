@@ -60,6 +60,8 @@
 #include "ConstraintEvaluator.h"
 #endif
 
+#define FILE_METHODS 1
+
 namespace libdap
 {
 
@@ -124,6 +126,7 @@ private:
     BaseType *_array_var;
     std::vector<BaseType *> _map_vars;
 
+protected: // subclasses need access [mjohnson 11 nov 2009]
     void _duplicate(const Grid &s);
 
 public:
@@ -154,10 +157,16 @@ public:
 
     virtual void add_var(BaseType *bt, Part part);
 
+    virtual void set_array(Array* p_new_arr);
+    virtual Array* add_map(Array* p_new_map, bool add_copy);
+    virtual Array* prepend_map(Array* p_new_map, bool add_copy);
+
     BaseType *array_var();
     Array *get_array();
 
+
     virtual unsigned int width();
+    virtual unsigned int width(bool constrained);
 
     virtual int components(bool constrained = false);
 
@@ -185,7 +194,7 @@ public:
     virtual void print_val(ostream &out, string space = "",
                            bool print_decl_p = true);
 
-    //#if FILE_METHODS
+#if FILE_METHODS
     virtual void print_decl(FILE *out, string space = "    ",
                             bool print_semi = true,
                             bool constraint_info = false,
@@ -194,7 +203,9 @@ public:
                            bool constrained = false);
     virtual void print_val(FILE *out, string space = "",
                            bool print_decl_p = true);
-    //#endif
+#endif
+
+    virtual void transfer_attributes(AttrTable *at_container);
 
     virtual bool check_semantics(string &msg, bool all = false);
 

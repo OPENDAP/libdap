@@ -63,6 +63,7 @@ static char rcsid[] not_used =
 #include "Clause.h"
 #include "Error.h"
 #include "InternalErr.h"
+#include "Keywords2.h"
 
 #include "parser.h"
 #include "debug.h"
@@ -85,7 +86,7 @@ static char rcsid[] not_used =
 #include "escaping.h"
 
 const string c_default_dap20_schema_location = "http://xml.opendap.org/dap/dap2.xsd";
-const string c_default_dap32_schema_location = "http://xml.opendap.org/dap/dap/3.2.xsd";
+const string c_default_dap32_schema_location = "http://xml.opendap.org/dap/dap3.2.xsd";
 
 const string c_dap20_namespace = "http://xml.opendap.org/ns/DAP2";
 const string c_dap32_namespace = "http://xml.opendap.org/ns/DAP/3.2#";
@@ -121,6 +122,8 @@ DDS::duplicate(const DDS &dds)
     d_dap_major = dds.d_dap_major;
     d_dap_minor = dds.d_dap_minor;
 
+    d_keywords = dds.d_keywords; // value copy; Keywords contains no pointers
+
     DDS &dds_tmp = const_cast<DDS &>(dds);
 
     // copy the things pointed to by the list, not just the pointers
@@ -140,13 +143,13 @@ DDS::duplicate(const DDS &dds)
     @param n The name of the data set. Can also be set using
     set_dataset_name(). */
 DDS::DDS(BaseTypeFactory *factory, const string &n)
-
-        : d_factory(factory), name(n), d_container(0), d_dap_major(2),
-        d_dap_minor(0), d_client_dap_major(2), d_client_dap_minor(0),
-        d_request_xml_base(""), d_timeout(0)
+        : d_factory(factory), name(n), d_container(0),
+          d_dap_major(2), d_dap_minor(0),
+          d_request_xml_base(""), d_timeout(0), d_keywords(),
+          d_max_response_size(0)
 {
     DBG(cerr << "Building a DDS with client major/minor: "
-            << d_client_dap_major << "." << d_client_dap_minor << endl);
+            << d_dap_major << "." << d_dap_minor << endl);
 }
 
 /** The DDS copy constructor. */
@@ -179,182 +182,64 @@ DDS::operator=(const DDS &rhs)
     return *this;
 }
 
-/** @brief Look for the parent of an HDF4 dimension attribute
-
-    If this attribute container's name ends in the '_dim_?' suffix, look
-    for the variable to which it's attributes should be bound: For an array,
-    they should be held in a sub-table of the array; for a Structure or
-    Sequence, I don't think the HDF4 handler ever makes these (since those
-    types don't have 'dimension' in hdf-land);  and for a Grid, the attributes
-    belong with the map variables.
-
-    @note This method does check that the \e source really is an hdf4 dimension
-    attribute.
-
-    @param source The attribute container, an AttrTable::entry instance.
-    @return the BaseType to which these attributes belong or null if none
-    was found. */
-BaseType *
-DDS::find_hdf4_dimension_attribute_home(AttrTable::entry *source)
-{
-    BaseType *btp;
-    string::size_type i = source->name.find("_dim_");
-    if (i != string::npos && (btp = var(source->name.substr(0, i)))) {
-        if (btp->is_vector_type()) {
-            return btp;
-        }
-        else if (btp->type() == dods_grid_c) {
-            // For a Grid, the hdf4 handler uses _dim_n for the n-th Map
-            // i+5 points to the character holding 'n'
-            int n = atoi(source->name.substr(i + 5).c_str());
-            DBG(cerr << "Found a Grid (" << btp->name() << ") and "
-                << source->name.substr(i) << ", extracted n: " << n << endl);
-            return *(dynamic_cast<Grid&>(*btp).map_begin() + n);
-        }
-    }
-
-    return 0;
-}
-
-/** Given an attribute container from a DAS, find or make a destination
-    for its contents in the DDS.
-    @param source Attribute table
-    @param dest_variable result param that holds the BaseType
-    @return Destination Attribute Table */
-AttrTable *
-DDS::find_matching_container(AttrTable::entry *source, BaseType **dest_variable)
-{
-    // The attribute entry 'source' must be a container
-    if (source->type != Attr_container)
-        throw InternalErr(__FILE__, __LINE__, "DDS::find_matching_container");
-
-    // Use the name of the attribute container 'source' to figure out where
-    // to put its contents.
-    BaseType *btp;
-    if ((btp = var(source->name))) {
-        // ... matches a variable name? Use var's table
-        *dest_variable = btp;
-        return &btp->get_attr_table();
-    }
-    else if ((btp = find_hdf4_dimension_attribute_home(source))) {
-        // ... hdf4 dimension attribute? Make a sub table and use that.
-        // btp can only be an Array or a Grid Map (which is an array)
-        if (btp->get_parent() && btp->get_parent()->type() == dods_grid_c) {
-            DBG(cerr << "Found a Grid, assigning to the map" << endl);
-            *dest_variable = btp;
-            return &btp->get_attr_table();
-        }
-        else { // must ba a plain Array
-            string::size_type i = source->name.find("_dim_");
-            string ext = source->name.substr(i + 1);
-            *dest_variable = btp;
-            return btp->get_attr_table().append_container(ext);
-        }
-    }
-    else {
-        // ... otherwise assume it's a global attribute.
-        AttrTable *at = d_attr.find_container(source->name);
-        if (!at) {
-            at = new AttrTable();       // Make a new global table if needed
-            d_attr.append_container(at, source->name);
-        }
-
-        *dest_variable = 0;
-        return at;
-    }
-}
-
-/** Given a DAS object, scavenge attributes from it and load them into this
-    object and the variables it contains.
-
-    If a DAS contains attributes from the current (8/2006) HDF4 server with
-    names like var_dim_0, var_dim_1, then make those attribute tables
-    sub tables of the \e var table.
-
-    @todo Generalize the code that treats the _dim_? attributes or make
-    is obsolete by fixing the HDF4 server.
-
-    @note This method is technically \e unnecessary because a server (or
-    client) can easily add attributes directly using the DDS::get_attr_table
-    or BaseType::get_attr_table methods and then poke values in using any
-    of the methods AttrTable provides. This method exists to ease the
-    transition to DDS objects which contain attribute information for the
-    existing servers (Since they all make DAS objects separately from the
-    DDS). They could be modified to use the same AttrTable methods but
-    operate on the AttrTable instances in a DDS/BaseType instead of those in
-    a DAS.
-
-    @param das Get attribute information from this DAS. */
-void
-DDS::transfer_attributes(DAS *das)
-{
-    // If there is a container set in the DDS then get the container from
-    // the DAS. If they are not the same container, then throw an exception
-    // (should be working on the same container). If the container does not
-    // exist in the DAS, then throw an exception
-    if( d_container )
-    {
-	if( das->container_name() != d_container_name )
-	{
-	    string err = (string)"Error transferring attributes: "
-			 + "working on container in dds, but not das" ;
-	    throw InternalErr(__FILE__, __LINE__, err ) ;
+/**
+ * This is the main method used to transfer attributes from a DAS object into a
+ * DDS. This uses the BaseType::transfer_attributes() method and the various
+ * implementations found here (in the constructors classes) and in handlers.
+ *
+ * This method uses a deep copy to transfer the attributes, so it is safe to
+ * delete the source DAS object passed to this method once it is done.
+ *
+ * @note To accommodate oddly built DAS objects produced by various handlers,
+ * specialize the methods there.
+ *
+ * @param das Transfer (copy) attributes from this DAS object.
+ */
+void DDS::transfer_attributes(DAS *das) {
+	// If there is a container set in the DDS then get the container from
+	// the DAS. If they are not the same container, then throw an exception
+	// (should be working on the same container). If the container does not
+	// exist in the DAS, then throw an exception
+	if (d_container) {
+		if (das->container_name() != d_container_name)
+			throw InternalErr(__FILE__, __LINE__,
+					"Error transferring attributes: working on a container in dds, but not das");
 	}
-    }
-    AttrTable *top_level = das->get_top_level_attributes() ;
 
-    // foreach container at the outer level
-    AttrTable::Attr_iter das_i = top_level->attr_begin();
-    AttrTable::Attr_iter das_e = top_level->attr_end();
-    while (das_i != das_e) {
-        DBG(cerr << "Working on the '" << (*das_i)->name << "' container."
-            << endl);
+	// Give each variable a chance to claim its attributes.
+	AttrTable *top_level = das->get_top_level_attributes();
 
-        AttrTable *source = (*das_i)->attributes;
-        // Variable that holds 'dest'; null for a global attribute.
-        BaseType *dest_variable = 0;
-        AttrTable *dest = find_matching_container(*das_i, &dest_variable);
+	Vars_iter var = var_begin();
+	while (var != var_end()) {
+		try {
+			DBG(cerr << "Processing the attributes for: " << (*var)->name() << " a " << (*var)->type_name() << endl);
+			(*var)->transfer_attributes(top_level);
+			var++;
+		} catch (Error &e) {
+			DBG(cerr << "Got this exception: " << e.get_error_message() << endl);
+			var++;
+			throw e;
+		}
+	}
 
-        // foreach source attribute in the das_i container
-        AttrTable::Attr_iter source_p = source->attr_begin();
-        while (source_p != source->attr_end()) {
-            DBG(cerr << "Working on the '" << (*source_p)->name << "' attribute"
-                << endl);
+	// Now we transfer all of the attributes still marked as global to the
+	// global container in the DDS.
 
-            // If this is container, we must have a container (this one) within
-            // a container (the 'source'). Look and see if the variable is a
-            // Constructor. If so, pass that container into
-            // Constructor::transfer_attributes()
-            if ((*source_p)->type == Attr_container) {
-                if (dest_variable && dest_variable->is_constructor_type()) {
-                    dynamic_cast<Constructor&>(*dest_variable).transfer_attributes(*source_p);
-                }
-                else {
-#if 0
-                    // Trick:
-                    DBG(cerr << "Is current source aliased: "
-                            << (*source_p)->is_alias << endl);
-                    AttrTable &local = *(*source_p)->attributes;
-                    for (AttrTable::Attr_iter i = local.attr_begin();
-                         i != local.attr_end(); ++i) {
-                        cerr << "... or one of its entries: " << (*i)->is_alias << endl;
-                    }
-#endif
-                    dest->append_container(new AttrTable(*(*source_p)->attributes),
-                                           (*source_p)->name);
-                }
-            }
-            else {
-                dest->append_attr(source->get_name(source_p),
-                                  source->get_type(source_p),
-                                  source->get_attr_vector(source_p));
-            }
+	AttrTable::Attr_iter at_cont_p = top_level->attr_begin();
+	while (at_cont_p != top_level->attr_end()) {
+		// In truth, all of the top level attributes should be containers, but
+		// this test handles the abnormal case where somehow someone makes a
+		// top level attribute that is not a container by silently dropping it.
+		if ((*at_cont_p)->type == Attr_container && (*at_cont_p)->attributes->is_global_attribute()) {
+			DBG(cerr << (*at_cont_p)->name << " is a global attribute." << endl);
+			// copy the source container so that the DAS passed in can be
+			// deleted after calling this method.
+			AttrTable *at = new AttrTable(*(*at_cont_p)->attributes);
+			d_attr.append_container(at, at->get_name());
+		}
 
-            ++source_p;
-        }
-
-        ++das_i;
-    }
+		at_cont_p++;
+	}
 }
 
 /** Get and set the dataset's name.  This is the name of the dataset
@@ -411,10 +296,39 @@ DDS::filename(const string &fn)
 }
 //@}
 
+void
+DDS::set_dap_major(int p)
+{
+    d_dap_major = p;
+
+    // This works because regardless of the order set_dap_major and set_dap_minor
+    // are called, once they both are called, the value in the string is
+    // correct. I protect against negative numbers because that would be
+    // nonsensical.
+    if (d_dap_minor >= 0) {
+	ostringstream oss;
+	oss << d_dap_major << "." << d_dap_minor;
+	d_dap_version = oss.str();
+    }
+}
+
+void
+DDS::set_dap_minor(int p)
+{
+    d_dap_minor = p;
+
+    if (d_dap_major >= 0) {
+	ostringstream oss;
+	oss << d_dap_major << "." << d_dap_minor;
+	d_dap_version = oss.str();
+    }
+}
+
 /** Given the dap protocol version either from a MIME header or from within
     the DDX Dataset element, parse that string and set the DDS fields.
-    @see set_dap_client_version()
-    @param version_string The version string from the MIME of XML document.
+
+    @param version_string The version string from the MIME (request) or XML
+    document.
  */
 void
 DDS::set_dap_version(const string &version_string)
@@ -423,50 +337,48 @@ DDS::set_dap_version(const string &version_string)
 
     int major = -1, minor = -1;
     char dot;
-    iss >> major;
-    iss >> dot;
-    iss >> minor;
+    if (!iss.eof() && !iss.fail())
+	iss >> major;
+    if (!iss.eof() && !iss.fail())
+	iss >> dot;
+    if (!iss.eof() && !iss.fail())
+	iss >> minor;
 
     DBG(cerr << "Major: " << major << ", dot: " << dot <<", Minor: " << minor << endl);
-
+#if 0
     if (major == -1 || minor == -1)
         throw Error("Could not parse the client dap (XDAP-Accept header) value");
+#endif
+
+    d_dap_version = version_string;
+
+    set_dap_major(major == -1 ? 2 : major);
+    set_dap_minor(minor == -1 ? 0 : minor);
+}
+
+/** Given the dap protocol version, parse that string and set the DDS fields.
+    This version of th method takes a double - a value that would be passed
+    to a server-side function. This provides a way to set the protocol using
+    stuff in the URL.
+
+    @param d The protocol version requested by the client, as a double.
+ */
+void
+DDS::set_dap_version(double d)
+{
+    int major = d;
+    int minor = (d-major)*10;
+
+    DBG(cerr << "Major: " << major << ", Minor: " << minor << endl);
+
+    ostringstream oss;
+    oss << major << "." << minor;
+    d_dap_version = oss.str();
 
     set_dap_major(major);
     set_dap_minor(minor);
 }
-#if 0
 
-// Having two dap versions is really confusing things... jhrg 8/21/09
-
-/** Given a version string passed to a server from a client in the XDAP-Accept
-    MIME header, parse that string and record the major and minor protocol
-    version numbers. This method differs from set_dap_version() in that it is
-    storing the version that the client would _like_ the server to use. The
-    actual protocol version to which this DDS/DDX conforms is found using the
-    get_dap_major() and get_dap_minor() methods.
-    @param version_string
- */
-void
-DDS::set_client_dap_version(const string &version_string)
-{
-    istringstream iss(version_string);
-
-    int major = -1, minor = -1;
-    char dot;
-    iss >> major;
-    iss >> dot;
-    iss >> minor;
-
-    DBG(cerr << "Major: " << major << ", dot: " << dot <<", Minor: " << minor << endl);
-
-    if (major == -1 || minor == -1)
-        throw Error("Could not parse the client dap (XDAP-Accept header) value");
-
-    set_client_dap_major(major);
-    set_client_dap_minor(minor);
-}
-#endif
 /** Get and set the current container. If there are multiple files being
     used to build this DDS, using a container will set a virtual structure
     for the current container.
@@ -520,6 +432,33 @@ DDS::container()
 
 //@}
 
+/** Get the size of a response. This method looks at the variables in the DDS
+ *  a computes the number of bytes in the response.
+ *
+ *  @note This version of the method does a poor job with Sequences. A better
+ *  implementation would look at row-constraint-based limitations and use them
+ *  for size computations. If a row-constraint is missing, return an error.
+ *
+ *  @param constrained Should the size of the whole DDS be used or should the
+ *  current constraint be taken into account?
+ */
+int
+DDS::get_request_size(bool constrained)
+{
+	int w = 0;
+    for (Vars_iter i = vars.begin(); i != vars.end(); i++) {
+    	if (constrained) {
+    		if ((*i)->send_p())
+    			w += (*i)->width(constrained);
+    	}
+    	else {
+    		w += (*i)->width(constrained);
+    	}
+    }
+
+    return w;
+}
+
 /** @brief Adds a copy of the variable to the DDS.
     Using the ptr_duplicate() method, perform a deep copy on the variable
     \e bt and adds the result to this DDS.
@@ -538,7 +477,11 @@ DDS::add_var(BaseType *bt)
     DBG2(cerr << "In DDS::add_var(), btp's address is: " << btp << endl);
     if( d_container )
     {
+        // Mem leak fix [mjohnson nov 2009]
+        // Structure::add_var() creates ANOTHER copy.
 	d_container->add_var( bt ) ;
+	// So we need to delete btp or else it leaks
+	delete btp; btp = 0;
     }
     else
     {
@@ -822,7 +765,7 @@ DDS::parse(string fname)
     }
     catch (Error &e) {
         fclose(in);
-        throw e;
+        throw ;
     }
 }
 
@@ -847,7 +790,7 @@ DDS::parse(int fd)
     }
     catch (Error &e) {
         fclose(in);
-        throw e;
+        throw ;
     }
 }
 
@@ -882,11 +825,18 @@ DDS::parse(FILE *in)
             throw *arg.error();
     }
 }
-//#if FILE_METHODS
+
+#if FILE_METHODS
 /** @brief Print the entire DDS to the specified file. */
 void
 DDS::print(FILE *out)
 {
+#if 0
+    ostringstream oss;
+    print(oss);
+
+    fwrite(oss.str().c_str(), oss.str().length(), 1, out);
+#else
     fprintf(out, "Dataset {\n") ;
 
     for (Vars_citer i = vars.begin(); i != vars.end(); i++) {
@@ -896,8 +846,10 @@ DDS::print(FILE *out)
     fprintf(out, "} %s;\n", id2www(name).c_str()) ;
 
     return ;
+#endif
 }
-//#endif
+#endif
+
 /** @brief Print the entire DDS to the specified ostream. */
 void
 DDS::print(ostream &out)
@@ -912,7 +864,8 @@ DDS::print(ostream &out)
 
     return ;
 }
-//#if FILE_METHODS
+
+#if FILE_METHODS
 /** @brief Print a constrained DDS to the specified file.
 
     Print those parts (variables) of the DDS structure to OS that
@@ -939,7 +892,8 @@ DDS::print_constrained(FILE *out)
 
     return;
 }
-//#endif
+#endif
+
 /** @brief Print a constrained DDS to the specified ostream.
 
     Print those parts (variables) of the DDS structure to OS that
@@ -966,7 +920,8 @@ DDS::print_constrained(ostream &out)
 
     return;
 }
-//#if FILE_METHODS
+
+#if FILE_METHODS
 class VariablePrintXML : public unary_function<BaseType *, void>
 {
     FILE *d_out;
@@ -980,8 +935,7 @@ public:
         bt->print_xml(d_out, "    ", d_constrained);
     }
 };
-//#endif
-//#if FILE_METHODS
+
 /** Print an XML representation of this DDS. This method is used to generate
     the part of the DDX response. The \c Dataset tag is \e not written by
     this code. The caller of this method must handle writing that and
@@ -1042,7 +996,7 @@ DDS::print_xml(FILE *out, bool constrained, const string &blob)
 
     fprintf(out, "</Dataset>\n");
 }
-//#endif
+#endif
 
 class VariablePrintXMLStrm : public unary_function<BaseType *, void>
 {
@@ -1089,7 +1043,7 @@ DDS::print_xml(ostream &out, bool constrained, const string &blob)
         out << "xmlns=\"" << c_dap32_namespace << "\"\n" ;
         out << "xmlns:dap=\"" << c_dap32_namespace << "\"\n" ;
 
-        out << "dap_version=\"" << get_dap_major() << "."
+        out << "dapVersion=\"" << get_dap_major() << "."
             << get_dap_minor() << "\"";
 
         if (!get_request_xml_base().empty()) {

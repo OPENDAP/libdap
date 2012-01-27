@@ -77,7 +77,7 @@ Constructor::Constructor(const string &n, const string &d, const Type &t)
         : BaseType(n, d, t)
 {}
 
-Constructor::Constructor(const Constructor &rhs) : BaseType(rhs)
+Constructor::Constructor(const Constructor &rhs) : BaseType(rhs), _vars(0)
 {}
 
 Constructor::~Constructor()
@@ -103,6 +103,7 @@ Constructor::var_begin()
     return _vars.begin() ;
 }
 
+#if 0
 /** @brief Look for the parent of an HDF4 dimension attribute
 
     If this attribute container's name ends in the '_dim_?' suffix, look
@@ -114,6 +115,9 @@ Constructor::var_begin()
 
     @note This method does check that the \e source really is an hdf4 dimension
     attribute.
+
+    @note I think the comment that Structures in HDF4 files cannot have
+    dimension attributes is wrong. 8/17/11 jhrg
 
     @param source The attribute container, an AttrTable::entry instance.
     @return the BaseType to which these attributes belong or null if none
@@ -139,7 +143,8 @@ Constructor::find_hdf4_dimension_attribute_home(AttrTable::entry *source)
 
     return 0;
 }
-
+#endif
+#if 0
 /** Given an attribute container from a table, find or make a destination
     for its contents in the current constructor variable. */
 AttrTable *
@@ -187,7 +192,8 @@ Constructor::find_matching_container(AttrTable::entry *source,
         return at;
     }
 }
-
+#endif
+#if 0
 /** Given an Attribute entry, scavenge attributes from it and load them into
     this object and the variables it contains. Assume that the caller has
     determined the table holds attributes pertinent to only this variable.
@@ -244,6 +250,52 @@ Constructor::transfer_attributes(AttrTable::entry * entry)
         ++source_p;
     }
 }
+#endif
+
+/** Given an Attribute table, scavenge attributes from it and load them into
+    this object and the variables it contains.
+
+    This implementation differs from the version in BaseType in that each of
+    the children of the Constructor are passed an attribute container if one
+    is found that matches the name of this Constructor variable.
+
+    @param at_container Search for attributes in this container.
+    */
+void Constructor::transfer_attributes(AttrTable *at_container) {
+	AttrTable *at = at_container->get_attr_table(name());
+
+	if (at) {
+		at->set_is_global_attribute(false);
+
+		Vars_iter var = var_begin();
+		while (var != var_end()) {
+			try {
+				DBG(cerr << "Processing the attributes for: " << (*var)->name() << " a " << (*var)->type_name() << endl);
+				(*var)->transfer_attributes(at);
+				var++;
+			} catch (Error &e) {
+				DBG(cerr << "Got this exception: " << e.get_error_message() << endl);
+				var++;
+				throw e;
+			}
+		}
+
+		// Trick: If an attribute that's within the container 'at' still has its
+		// is_global_attribute property set, then it's not really a global attr
+		// but instead an attribute that belongs to this Constructor.
+		AttrTable::Attr_iter at_p = at->attr_begin();
+		while (at_p != at->attr_end()) {
+			if (at->is_global_attribute(at_p)) {
+				if (at->get_attr_type(at_p) == Attr_container)
+					get_attr_table().append_container(new AttrTable(*at->get_attr_table(at_p)), at->get_name(at_p));
+				else
+					get_attr_table().append_attr(at->get_name(at_p), at->get_type(at_p), at->get_attr_vector(at_p));
+			}
+			at_p++;
+		}
+
+	}
+}
 
 /** Returns an iterator referencing the end of the list of structure
     elements. Does not reference the last structure element. */
@@ -286,7 +338,7 @@ Constructor::get_var_index(int i)
     return *(_vars.begin() + i);
 }
 
-//#if FILE_METHODS
+#if FILE_METHODS
 void
 Constructor::print_decl(FILE *out, string space, bool print_semi,
                         bool constraint_info, bool constrained)
@@ -311,7 +363,8 @@ Constructor::print_decl(FILE *out, string space, bool print_semi,
     if (print_semi)
         fprintf(out, ";\n") ;
 }
-//#endif
+#endif
+
 void
 Constructor::print_decl(ostream &out, string space, bool print_semi,
                         bool constraint_info, bool constrained)
@@ -336,7 +389,8 @@ Constructor::print_decl(ostream &out, string space, bool print_semi,
     if (print_semi)
 	out << ";\n" ;
 }
-//#if FILE_METHODS
+
+#if FILE_METHODS
 class PrintField : public unary_function<BaseType *, void>
 {
     FILE *d_out;
@@ -380,7 +434,8 @@ Constructor::print_xml(FILE *out, string space, bool constrained)
         fprintf(out, "/>\n");
     }
 }
-//#endif
+#endif
+
 class PrintFieldStrm : public unary_function<BaseType *, void>
 {
     ostream &d_out;

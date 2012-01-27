@@ -62,7 +62,13 @@
 #include "DapObj.h"
 #endif
 
+#ifndef KEYWORDS_H_
+#include "Keywords2.h"
+#endif
+
 using std::cout;
+
+#define FILE_METHODS 1
 
 namespace libdap
 {
@@ -175,53 +181,35 @@ private:
     BaseTypeFactory *d_factory;
 
     string name;                // The dataset name
-    string d_filename;		// File name (or other OS identifier) for
+    string d_filename;		    // File name (or other OS identifier) for
     string d_container_name;	// name of container structure
-    Structure *d_container;	// current container for container name
-				// dataset or part of dataset.
+    Structure *d_container; 	// current container for container name
+				                // dataset or part of dataset.
 
-    // These are used on the client-side and correspond to the version of the
-    // response. The client_dap_major/minor fields hold information sent from
-    // a client describing what it would like.
-
-    int d_dap_major;       // The protocol major version number
-    int d_dap_minor;       // ... and minor version number
-
-    // These hold the major and minor versions of DAP that the client sent in
-    // the XDAP-Accept header. If the header is not sent, these default to 2.0
-    int d_client_dap_major;
-    int d_client_dap_minor;
-
+    int d_dap_major;       	    // The protocol major version number
+    int d_dap_minor;       	    // ... and minor version number
+    string d_dap_version; 	    // String version of the protocol
     string d_request_xml_base;
 
     AttrTable d_attr;           // Global attributes.
 
     vector<BaseType *> vars;    // Variables at the top level
-#if 0
-    bool is_global_attr(string name);
-    void add_global_attribute(AttrTable::entry *entry);
-#endif
-    BaseType *find_hdf4_dimension_attribute_home(AttrTable::entry *source);
+
+    // BaseType *find_hdf4_dimension_attribute_home(AttrTable::entry *source);
 
     int d_timeout;              // alarm time in seconds. If greater than
                                 // zero, raise the alarm signal if more than
                                 // d_timeout seconds are spent reading data.
+    Keywords d_keywords;	    // Holds keywords parsed from the CE
+
+    long d_max_response_size;   // In bytes
+
     friend class DDSTest;
 
 protected:
     void duplicate(const DDS &dds);
     BaseType *leaf_match(const string &name, BaseType::btp_stack *s = 0);
     BaseType *exact_match(const string &name, BaseType::btp_stack *s = 0);
-#if 0
-    void transfer_attr(DAS *das, const AttrTable::entry *ep, BaseType *btp,
-                       const string &suffix = "");
-    void transfer_attr_table(DAS *das, AttrTable *at, BaseType *btp,
-                             const string &suffix = "");
-    void transfer_attr_table(DAS *das, AttrTable *at, Constructor *c,
-                             const string &suffix = "");
-#endif
-    virtual AttrTable *find_matching_container(AttrTable::entry *source,
-            BaseType **dest_variable);
 
 public:
     typedef std::vector<BaseType *>::const_iterator Vars_citer ;
@@ -273,33 +261,33 @@ public:
     int get_dap_minor() const { return d_dap_minor; }
 
     /// Set the DAP major version (typically using info from the client)
-    void set_dap_major(int p) { d_dap_major = p; }
+    void set_dap_major(int p);
     /// Set the DAP minor version (typically using info from the client)
-    void set_dap_minor(int p) { d_dap_minor = p; }
+    void set_dap_minor(int p);
 
     void set_dap_version(const string &version_string);
-#if 0
-    // These are confusing things because having two version numbers, even
-    // though the idea is good sounding, is breaking stuff.
+    void set_dap_version(double d);
 
-    /// Get the DAP major version as sent by the client
-    int get_client_dap_major() const { return d_client_dap_major; }
-    /// Get the DAP minor version as sent by the client
-    int get_client_dap_minor() const { return d_client_dap_minor; }
+    string get_dap_version() const { return d_dap_version; }
 
-    /// Set the DAP major version (typically using info from the client)
-    void set_client_dap_major(int p) { d_client_dap_major = p; }
-    /// Set the DAP minor version (typically using info from the client)
-    void set_client_dap_minor(int p) { d_client_dap_minor = p; }
-
-    void set_client_dap_version(const string &version_string);
-#endif
+    Keywords &get_keywords() { return d_keywords; }
 
     /// Get the URL that will return this DDS/DDX/DataThing
     string get_request_xml_base() const { return d_request_xml_base; }
 
     /// @see get_request_xml_base
     void set_request_xml_base(const string &xb) { d_request_xml_base = xb; }
+
+    /// Get the maximum response size, in KB. Zero indicates no limit.
+    long get_response_limit() { return d_max_response_size; }
+
+    /** Set the maximum response size. Zero is the default value. The size
+        is given in kilobytes.
+        @param size The maximum size of the response in kilobytes. */
+    void set_response_limit(long size) { d_max_response_size = size * 1024; }
+
+    /// Get the estimated response size.
+    int get_request_size(bool constrained);
 
     string container_name() ;
     void container_name( const string &cn ) ;
@@ -339,17 +327,13 @@ public:
     void parse(string fname);
     void parse(int fd);
     void parse(FILE *in = stdin);
-    //#if FILE_METHODS
+#if FILE_METHODS
     void print(FILE *out);
-    //#endif
-    void print(ostream &out);
-    //#if FILE_METHODS
     void print_constrained(FILE *out);
-    //#endif
-    void print_constrained(ostream &out);
-    //#if FILE_METHODS
     void print_xml(FILE *out, bool constrained, const string &blob = "");
-    //#endif
+#endif
+    void print(ostream &out);
+    void print_constrained(ostream &out);
     void print_xml(ostream &out, bool constrained, const string &blob = "");
 
     void mark_all(bool state);

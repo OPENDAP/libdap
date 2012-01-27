@@ -146,13 +146,13 @@ ConstraintEvaluator::append_clause(btp_func func, rvalue_list *args)
     expr.push_back(clause);
 }
 
-/** The DDS maintains a list of BaseType pointers for all the constants
-    that the constraint expression parser generates. These objects are
-    deleted by the DDS destructor. Note that there are no list accessors;
-    these constants are never accessed from the list. The list is simply
-    a convenient way to make sure the constants are disposed of properly.
-
-    @todo Update this comment (ConstraintEvaluator, not DDS. */
+/** The Constraint Evaluator maintains a list of BaseType pointers for all the
+ 	 constants that the constraint expression parser generates. These objects
+ 	 are deleted by the Constraint Evaluator destructor. Note that there are no
+ 	 list accessors; these constants are never accessed from the list. The list
+ 	 is simply a convenient way to make sure the constants are disposed of
+ 	 properly.
+ */
 void
 ConstraintEvaluator::append_constant(BaseType *btp)
 {
@@ -178,7 +178,7 @@ public:
     any of these functions, the entries in the list allow the parser to evaluate
     it. The functions are of three types: those that return boolean values,
     those that return real (also called BaseType) values, and those that
-    are applied during evaluation of the project for side effect
+    are applied during evaluation of the projection for side effect
 
     @note The add_function() methods will replace a function of the same name,
     so it is possible to overwrite functions in specific handlers if the
@@ -192,7 +192,6 @@ public:
     @name External Function Accessors
 */
 //@{
-#if 1
 /** @brief Add a boolean function to the list. */
 void
 ConstraintEvaluator::add_function(const string &name, bool_func f)
@@ -201,7 +200,7 @@ ConstraintEvaluator::add_function(const string &name, bool_func f)
     function func(name, f);
     functions.push_back(func);
 }
-#endif
+
 /** @brief Add a BaseType function to the list. */
 void
 ConstraintEvaluator::add_function(const string &name, btp_func f)
@@ -219,7 +218,7 @@ ConstraintEvaluator::add_function(const string &name, proj_func f)
     function func(name, f);
     functions.push_back(func);
 }
-#if 1
+
 /** @brief Find a Boolean function with a given name in the function list. */
 bool
 ConstraintEvaluator::find_function(const string &name, bool_func *f) const
@@ -235,7 +234,7 @@ ConstraintEvaluator::find_function(const string &name, bool_func *f) const
 
     return false;
 }
-#endif
+
 /** @brief Find a BaseType function with a given name in the function list. */
 bool
 ConstraintEvaluator::find_function(const string &name, btp_func *f) const
@@ -269,7 +268,11 @@ ConstraintEvaluator::find_function(const string &name, proj_func *f) const
 //@}
 
 /** @brief Does the current constraint expression return a BaseType
-    pointer? */
+    pointer?
+    This method does not evaluate the clause, it provides information to the
+    evaluator regarding _how_ to evaluate the clause.
+    @return True if the clause is a function that returns a BaseType* and
+    false otherwise */
 bool
 ConstraintEvaluator::functional_expression()
 {
@@ -294,6 +297,98 @@ ConstraintEvaluator::eval_function(DDS &dds, const string &)
         return result;
     else
         return NULL;
+}
+
+/** @brief Does the current constraint expression return a DDS pointer?
+
+    This method does not evaluate the clauses, it provides information to the
+    evaluator regarding _how_ to evaluate the clause.
+
+    @note Added for libdap 3.11
+
+    @return True if the clause is a function that returns a DDS* and
+    false otherwise */
+bool ConstraintEvaluator::function_clauses()
+{
+    if (expr.empty())
+	return false;
+
+    for (unsigned int i = 0; i < expr.size(); ++i) {
+	Clause *cp = expr[i];
+	if (!cp->value_clause())
+	    return false;
+    }
+
+    return true;
+}
+
+/** @brief Evaluate a function-valued constraint expression that contains
+    several function calls.
+
+    This method can be called for any function-valued constraint expression.
+    Unlike eval_function(), it will package the return value in a new DDS
+    object. The server should free this object once it has been serialized
+    and sent.
+
+    @note While there is another type of function that can appear in a CE (a
+    'projection function') those are evaluated by the ce parser - they are used
+    to insert new variables into the DDS as a side effect of CE evaluation.
+    That kind of function can never appear here; these are all functions that
+    return BaseType pointers.
+
+    @note Added for libdap 3.11 */
+DDS *
+ConstraintEvaluator::eval_function_clauses(DDS &dds)
+{
+    if (expr.empty())
+	throw InternalErr(__FILE__, __LINE__, "The constraint expression is empty.");
+
+    DDS *fdds = new DDS(dds.get_factory(), "function_result_" + dds.get_dataset_name());
+    for (unsigned int i = 0; i < expr.size(); ++i) {
+	Clause *cp = expr[i];
+	BaseType *result;
+	if (cp->value(dds, &result)) {
+	    result->set_send_p(true);
+	    fdds->add_var(result);
+	}
+	else {
+		delete fdds;
+	    throw Error("A function was called but failed to return a value.");
+	}
+    }
+
+    return fdds;
+}
+
+/** @brief Evaluate a function-valued constraint expression that contains
+    several function calls. Takes and returns a DataDDS.
+
+    @see ConstraintEvaluator::eval_function_clauses(DataDDS &dds)
+    @note Added for libdap 3.11 */
+DataDDS *
+ConstraintEvaluator::eval_function_clauses(DataDDS &dds)
+{
+    if (expr.empty())
+	throw InternalErr(__FILE__, __LINE__, "The constraint expression is empty.");
+
+    DataDDS *fdds = new DataDDS(dds.get_factory(),
+				"function_result_" + dds.get_dataset_name(),
+				dds.get_version(), dds.get_protocol());
+
+    for (unsigned int i = 0; i < expr.size(); ++i) {
+	Clause *cp = expr[i];
+	BaseType *result;
+	if (cp->value(dds, &result)) {
+	    result->set_send_p(true);
+	    fdds->add_var(result);
+	}
+	else {
+		delete fdds;
+	    throw Error("A function was called but failed to return a value.");
+	}
+    }
+
+    return fdds;
 }
 
 /** @brief Does the current constraint expression return a boolean value? */

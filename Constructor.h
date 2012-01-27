@@ -26,12 +26,13 @@
 #ifndef _constructor_h
 #define _constructor_h 1
 
-
 #include <vector>
 
 #ifndef _basetype_h
 #include "BaseType.h"
 #endif
+
+#define FILE_METHODS 1
 
 namespace libdap
 {
@@ -41,15 +42,16 @@ class Constructor: public BaseType
 {
 private:
     Constructor();  // No default ctor.
-    BaseType *find_hdf4_dimension_attribute_home(AttrTable::entry *source);
+    // BaseType *find_hdf4_dimension_attribute_home(AttrTable::entry *source);
 
 protected:
     std::vector<BaseType *> _vars;
 
     void _duplicate(const Constructor &s);
+#if 0
     virtual AttrTable *find_matching_container(AttrTable::entry *source,
             BaseType **dest_variable);
-
+#endif
     Constructor(const string &n, const Type &t);
     Constructor(const string &n, const string &d, const Type &t);
 
@@ -62,7 +64,10 @@ public:
     virtual ~Constructor();
 
     Constructor &operator=(const Constructor &rhs);
+#if 0
     virtual void transfer_attributes(AttrTable::entry *entry);
+#endif
+    virtual void transfer_attributes(AttrTable *at_container);
 
     Vars_iter var_begin();
     Vars_iter var_end();
@@ -81,14 +86,14 @@ public:
     virtual void print_xml(ostream &out, string space = "    ",
                            bool constrained = false);
 
-    //#if FILE_METHODS
+#if FILE_METHODS
     virtual void print_decl(FILE *out, string space = "    ",
                             bool print_semi = true,
                             bool constraint_info = false,
                             bool constrained = false);
     virtual void print_xml(FILE *out, string space = "    ",
                            bool constrained = false);
-    //#endif
+#endif
 
     virtual void dump(ostream &strm) const ;
 };

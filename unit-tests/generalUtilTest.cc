@@ -104,7 +104,7 @@ public:
 	    << prune_spaces(test_server_ce_spaces) << endl);
 	CPPUNIT_ASSERT(prune_spaces(test_server_ce_spaces) == test_server_ce);
 
-	string hdf_two_var = "http://test.opendap.org/opendap/nph-dods/data/hdf/S3096277.HDF.Z?Avg_Wind_Speed[0:5][0],RMS_Wind_Speed[0:5][0]";
+	string hdf_two_var = "http://test.opendap.org/dap/data/hdf/S3096277.HDF.Z?Avg_Wind_Speed[0:5][0],RMS_Wind_Speed[0:5][0]";
 	CPPUNIT_ASSERT(prune_spaces(hdf_two_var) == hdf_two_var);
     }
 
@@ -140,6 +140,7 @@ public:
 	CPPUNIT_ASSERT(id2www("This/is") == "This/is");
 	CPPUNIT_ASSERT(id2www("This%is") == "This%25is");
 	CPPUNIT_ASSERT(id2www("This&is") == "This%26is");
+	CPPUNIT_ASSERT(id2www("%This&is") == "%25This%26is");
     }
 
     void www2id_test() {
@@ -163,6 +164,8 @@ public:
 
 	CPPUNIT_ASSERT(www2id("Grid%20Data%26Fields[20][20]", "%", "%20%26")
 	        == "Grid%20Data%26Fields[20][20]");
+	cerr << "www2id(\"%25This%26is\"): " << www2id("%25This%26is") << endl;
+	CPPUNIT_ASSERT(www2id("%25This%26is") == "%This&is");
 
     }
 
@@ -297,8 +300,8 @@ public:
 	CPPUNIT_ASSERT(id2xml("'abc'def") == "&apos;abc&apos;def");
 	CPPUNIT_ASSERT(id2xml("\"abc\"def\"") == "&quot;abc&quot;def&quot;");
 	// To get '\\' in a string both the backslashes must be escaped.
-	cerr << id2xml("octal escape: \\\\012") << endl;
-	CPPUNIT_ASSERT(id2xml("octal escape: \\\\012") == "octal escape: &#x0a;");
+	DBG(cerr << id2xml("octal escape: \\\\012") << endl);
+	CPPUNIT_ASSERT(id2xml("octal escape: \\\\012") == "octal escape: \\\\012");
     }
 
     void xml2id_test() {
