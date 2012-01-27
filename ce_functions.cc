@@ -1261,16 +1261,23 @@ function_ugrid_demo(int argc, BaseType * argv[], DDS &dds, BaseType **btpp)
 	"Fledgling code for Unstructured grid operations.\n" +
 	"</function>";
     
+    if (argc == 0) {
+	Str *response = new Str("info");
+	response->set_value(info);
+	*btpp = response;
+	return;
+    }
+
     // Check number of arguments; DBG is a macro. Use #define
     // DODS_DEBUG to activate the debugging stuff.
     if (argc != 2)
         throw Error(malformed_expr,"Wrong number of arguments to ugrid_demo. ugrid_demo(dim:int32, condition:string");
 
     if (argv[0]->type() != dods_int32_c) {
-        throw Error(malformed_expr,"Wrong type for second argument. ugrid_demo(dim:int32, condition:string");
+        throw Error(malformed_expr,"Wrong type for first argument. ugrid_demo(dim:int32, condition:string");
     }
     if (argv[1]->type() != dods_str_c) {
-        throw Error(malformed_expr,"Wrong type for first argument. ugrid_demo(dim:int32, condition:string");
+        throw Error(malformed_expr,"Wrong type for second argument. ugrid_demo(dim:int32, condition:string");
     }
 
     BaseType *result = 0;		// This will hold the result
