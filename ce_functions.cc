@@ -82,14 +82,16 @@ static char rcsid[]not_used =
 #include "debug.h"
 #include "util.h"
 
-#include "gridfields/restrict.h"
-#include "gridfields/gridfield.h"
-#include "gridfields/grid.h"
-#include "gridfields/cell.h"
-#include "gridfields/cellarray.h"
-#include "gridfields/array.h"
-#include "gridfields/implicit0cells.h"
-#include "gridfields/gridfieldoperator.h"
+#ifdef GRIDFIELDS
+#include <gridfields/restrict.h>
+#include <gridfields/gridfield.h>
+#include <gridfields/grid.h>
+#include <gridfields/cell.h>
+#include <gridfields/cellarray.h>
+#include <gridfields/array.h>
+#include <gridfields/implicit0cells.h>
+#include <gridfields/gridfieldoperator.h>
+#endif
 
 //  We wrapped VC++ 6.x strtod() to account for a short coming
 //  in that function in regards to "NaN".  I don't know if this
@@ -237,6 +239,7 @@ void set_array_using_double(Array * dest, double *src, int src_len)
     dest->set_read_p(true);
 }
 
+#ifdef GRIDFIELDS
 template<typename DODS, typename T> T *extract_array_helper(Array *a) 
 {
   DBGSTREAM << "Extracting array values..." << endl;
@@ -255,7 +258,9 @@ template<typename DODS, typename T> T *extract_array_helper(Array *a)
 
   return dest;
 }
+#endif // GRIDFIELDS
 
+#ifdef GRIDFIELDS
 GF::Array *extract_gridfield_array(Array *a) {
     if ((a->type() == dods_array_c && !a->var()->is_simple_type())
   || a->var()->type() == dods_str_c || a->var()->type() == dods_url_c)
@@ -303,7 +308,9 @@ GF::Array *extract_gridfield_array(Array *a) {
     }
     return gfa;
 };
+#endif // GRIDFIELDS
 
+#ifdef GRIDFIELDS
 /*
 If the array has the exact dimensions in the vector dims, in the same order, 
 return true.  Otherwise return false. 
@@ -334,7 +341,9 @@ bool same_dimensions(Array *arr, vector<Array::dimension> &dims) {
   }
   return true;
 }
+#endif // GRIDFIELDS
 
+#ifdef GRIDFIELDS
 /** Given a pointer to an Array which holds a numeric type, extract the
  values and return in an array of T. This function allocates the
  array using 'new T[n]' so delete[] can be used when you are done
@@ -390,7 +399,7 @@ T *extract_array(Array * a)
     }
 }
 
-
+#endif // GRIDFIELDS
 
 template<class T> static double *extract_double_array_helper(Array * a)
 {
@@ -1226,7 +1235,7 @@ function_geoarray(int argc, BaseType * argv[], DDS &, BaseType **btpp)
 }
 #endif
 
-
+#ifdef GRIDFIELDS
 
 /** This is a stub Constraint Expression (i.e., server-side) function
     that will evolve into an interface for Unstructured Grid
@@ -1466,10 +1475,13 @@ We can therefore guarantee that nodes are numbered from 0.
     *btpp = result;
     return;
 }
+#endif // GRIDFIELDS
 
 void register_functions(ConstraintEvaluator & ce)
 {
+#ifdef GRIDFIELDS
     ce.add_function("ugrid_demo", function_ugrid_demo);
+#endif
     ce.add_function("grid", function_grid);
     ce.add_function("geogrid", function_geogrid);
     ce.add_function("linear_scale", function_linear_scale);
