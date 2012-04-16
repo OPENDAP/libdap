@@ -988,8 +988,8 @@ DDS::print_xml(FILE *out, bool constrained, const string &blob)
         fprintf(out, "    <dataBLOB href=\"\"/>\n");
     }
     else if (!blob.empty()
-	     && (get_dap_major() == 3 && get_dap_minor() >= 2)
-	     || get_dap_major() >= 4) {
+	     && ((get_dap_major() == 3 && get_dap_minor() >= 2)
+		 || get_dap_major() >= 4)) {
 	fprintf(out, "    <blob href=\"cid:%s\"/>\n", blob.c_str());
     }
 
@@ -1077,8 +1077,8 @@ DDS::print_xml(ostream &out, bool constrained, const string &blob)
         out << "    <dataBLOB href=\"\"/>\n" ;
     }
     else if (!blob.empty()
-	     && (get_dap_major() == 3 && get_dap_minor() >= 2)
-	     || get_dap_major() >= 4) {
+	     && ((get_dap_major() == 3 && get_dap_minor() >= 2)
+		 || get_dap_major() >= 4)) {
 	out << "    <blob href=\"cid:" << blob << "\"/>\n";
     }
 

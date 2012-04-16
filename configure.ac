@@ -307,7 +307,7 @@ libgf_ok="no"
 AC_WITH([gridfields],
     [GF_LIBS="-L$withval/lib -lgridfields"
      GF_CFLAGS="-I$withval/include"
-     AC_DEFINE([GRDIFIELDS],[1],[define if gridfields lib is present])
+     AC_DEFINE([GRIDFIELDS],[1],[define if gridfields lib is present])
      libgf_ok="yes"],
     [])
 
