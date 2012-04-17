@@ -50,6 +50,7 @@
 #endif
 #include "HTTPCacheInterruptHandler.h"
 #include "HTTPCacheTable.h"
+#include "HTTPCacheMacros.h"
 
 #include "util_mit.h"
 #include "debug.h"
@@ -62,7 +63,7 @@
 #define REMOVE(a) do { \
 		int s = remove((a)); \
 		if (s != 0) \
-			throw InternalErr(__FILE__, __LINE__, "Coule not remove file: " + long_to_string(s)); \
+			throw InternalErr(__FILE__, __LINE__, "Cache error; could not remove file: " + long_to_string(s)); \
 	} while(0);
 #define MKSTEMP(a) _open(_mktemp((a)),_O_CREAT,_S_IREAD|_S_IWRITE)
 #define DIR_SEPARATOR_CHAR '\\'
@@ -135,15 +136,15 @@ delete_cache_entry(HTTPCacheTable::CacheEntry *e)
 HTTPCacheTable::~HTTPCacheTable()
 {
     for (int i = 0; i < CACHE_TABLE_SIZE; ++i) {
-	HTTPCacheTable::CacheEntries *cp = get_cache_table()[i];
-	if (cp) {
-	    // delete each entry
-	    for_each(cp->begin(), cp->end(), delete_cache_entry);
+        HTTPCacheTable::CacheEntries *cp = get_cache_table()[i];
+        if (cp) {
+            // delete each entry
+            for_each(cp->begin(), cp->end(), delete_cache_entry);
 
-	    // now delete the vector that held the entries
-	    delete get_cache_table()[i];
-	    get_cache_table()[i] = 0;
-	}
+            // now delete the vector that held the entries
+            delete get_cache_table()[i];
+            get_cache_table()[i] = 0;
+        }
     }
 
     delete[] d_cache_table;
@@ -281,7 +282,7 @@ HTTPCacheTable::cache_index_delete()
 {
 	d_new_entries = 0;
 	
-    return (REMOVE(d_cache_index.c_str()) == 0);
+    return (REMOVE_BOOL(d_cache_index.c_str()) == 0);
 }
 
 /** Read the saved set of cached entries from disk. Consistency between the
@@ -539,7 +540,9 @@ entry_disk_space(int size, unsigned int block_size)
 void
 HTTPCacheTable::add_entry_to_cache_table(CacheEntry *entry)
 {
-    int hash = entry->hash;
+    unsigned int hash = entry->hash;
+    if (hash > CACHE_TABLE_SIZE)
+        throw InternalErr(__FILE__, __LINE__, "Hash value too large!");
 
     if (!d_cache_table[hash])
         d_cache_table[hash] = new CacheEntries;

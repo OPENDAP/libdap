@@ -7,7 +7,8 @@ aclocaldir=$(datadir)/aclocal
 pkgconfigdir=$(libdir)/pkgconfig
 
 # Arrange to build with the backward compatibility mode enabled.
-AM_CPPFLAGS = -I$(top_srcdir)/gl -I$(top_srcdir)/GNU 
+AM_CPPFLAGS = -I$(top_srcdir)/gl -I$(top_srcdir)/GNU $(XML2_CFLAGS)
+# -I$(top_srcdir)/xstream
 AM_CXXFLAGS = 
 if COMPILER_IS_GCC
 AM_CXXFLAGS += -Wall -W -Wcast-align
@@ -32,32 +33,44 @@ lib_LTLIBRARIES = libdap.la libdapclient.la libdapserver.la
 bin_SCRIPTS = dap-config dap-config-pkgconfig
 
 bin_PROGRAMS = getdap
+# fdiostream_test
 
-BUILT_SOURCES = $(GRAM_SRC) dods-datatypes.h xdr-datatypes.h
+# sbin_PROGRAMS = deflate
+
+BUILT_SOURCES = $(GRAM_SRC) dods-datatypes.h xdr-datatypes.h getdap.1 dap-config.1
+
+man_MANS = getdap.1 dap-config.1
+
+%.1: %.man1
+	groff -t -e -mandoc -Tascii $< | col -bx > $@
 
 libparsers_la_SOURCES = $(GRAM_SRC) 
+libparsers_la_CPPFLAGS = $(AM_CPPFLAGS) #$(XML2_CFLAGS)
+libparsers_la_LIBADD = $(XML2_LIBS)
 
-# $(GRIDFIELD_SRC)
 libdap_la_SOURCES = $(DAP_SRC) $(GNU_SRC) 
 libdap_la_LDFLAGS = -version-info $(LIBDAP_VERSION)
-libdap_la_CPPFLAGS = $(AM_CPPFLAGS) $(XML2_CFLAGS)
-libdap_la_LIBADD = $(XML2_LIBS) $(PTHREAD_LIBS) $(GF_LIBS) gl/libgnu.la libparsers.la
+libdap_la_CPPFLAGS = $(AM_CPPFLAGS) #$(XML2_CFLAGS)
+libdap_la_LIBADD = $(XML2_LIBS) $(PTHREAD_LIBS) -lcrypto gl/libgnu.la libparsers.la
 
 libdapclient_la_SOURCES = $(CLIENT_SRC) 
 libdapclient_la_LDFLAGS = -version-info $(CLIENTLIB_VERSION)
-libdapclient_la_CPPFLAGS = $(AM_CPPFLAGS) $(CURL_CFLAGS) $(XML2_CFLAGS)
-libdapclient_la_LIBADD = $(CURL_LIBS) libdap.la $(PTHREAD_LIBS) $(GF_LIBS)
+#libdapclient_la_CPPFLAGS = $(AM_CPPFLAGS) $(CURL_CFLAGS) $(XML2_CFLAGS)
+libdapclient_la_CPPFLAGS = $(AM_CPPFLAGS) $(CURL_CFLAGS)
+libdapclient_la_LIBADD = $(CURL_LIBS) libdap.la $(PTHREAD_LIBS)
 
 libdapserver_la_SOURCES = $(SERVER_SRC)
 libdapserver_la_LDFLAGS = -version-info $(SERVERLIB_VERSION)
-libdapserver_la_LIBADD = libdap.la $(UUID_LIBS) $(GF_LIBS)
+libdapserver_la_LIBADD = libdap.la $(UUID_LIBS)
 
 pkginclude_HEADERS = $(DAP_HDR) $(GNU_HDR) $(CLIENT_HDR) $(SERVER_HDR) 
-noinst_HEADERS = config_dap.h 
-# $(GRIDFIELD_HDR)
+
+noinst_HEADERS = config_dap.h
+
+# fdiostream_test_SOURCES = GNU/fdiostream_test.cc
 
 getdap_SOURCES = getdap.cc
-getdap_LDADD = libdapclient.la libdap.la $(GF_LIBS)
+getdap_LDADD = libdapclient.la libdap.la
 getdap_CPPFLAGS = $(AM_CPPFLAGS) $(CURL_CFLAGS)
 
 LEX_YACC_EXTRA = das.lex das.y dds.lex dds.y ce_expr.lex ce_expr.y gse.lex \
@@ -66,12 +79,16 @@ LEX_YACC_EXTRA = das.lex das.y dds.lex dds.y ce_expr.lex ce_expr.y gse.lex \
 EXTRA_DIST = ChangeLog COPYING README.dodsrc COPYRIGHT_URI	 \
 	COPYRIGHT_W3C GNU/README doxy.conf doxy_private.conf libdap.spec \
 	VCPP dods-datatypes-static.h xdr-datatypes-static.h \
-	dap-config-pkgconfig $(LEX_YACC_EXTRA) $(GRAM_SRC) OSX_Resources
+	dap-config-pkgconfig $(LEX_YACC_EXTRA) $(GRAM_SRC) OSX_Resources \
+	getdap.man1 dap-config.man1
+
+# README.AIS xstream/README 
 
 dist_aclocal_DATA = conf/libdap.m4
 pkgconfig_DATA = libdap.pc libdapclient.pc libdapserver.pc
 
-CLEANFILES = *.log *.output *.gcda *.gcno $(GRAM_SRC) dods-datatypes.h xdr-datatypes.h
+CLEANFILES = *.log *.output *.gcda *.gcno $(GRAM_SRC) dods-datatypes.h \
+    xdr-datatypes.h getdap.1 dap-config.1
 
 # Not nearly as clean as it could be, but this removes .svn directories
 # in subdirs.
@@ -97,8 +114,6 @@ cccc:
 	-mkdir cccc
 	cccc --outdir=cccc $(DAP_SRC) $(SERVER_SRC) $(CLIENT_SRC) \
 	$(DAP_HDR) $(SERVER_HDR) $(CLIENT_HDR)
-
-# $(GRIDFIELD_HDR) $(GRIDFIELD_SRC)
 
 ###########################################################################
 
@@ -210,34 +225,6 @@ GRAM_SRC = lex.das.cc das.tab.cc das.tab.hh lex.dds.cc dds.tab.cc	\
 	lex.Error.cc Error.tab.cc Error.tab.hh gse.tab.hh gse.tab.cc	\
 	lex.gse_.cc
 
-GRIDFIELD_SRC = gridfields/apply.cc      gridfields/gridfield.cc \
-gridfields/array.cc      gridfields/gridfieldoperator.cc \
-gridfields/cellarray.cc  gridfields/implicit0cells.cc \
-gridfields/cell.cc       gridfields/rankeddataset.cc \
-gridfields/dataset.cc    gridfields/restrict.cc \
-gridfields/expr.cc       gridfields/tuple.cc \
-gridfields/fparser.cc    gridfields/type.cc \
-gridfields/grid.cc       gridfields/unarynodemap.cc \
-gridfields/gfutil.cc	 gridfields/timing.cc \
-gridfields/sift.cc
-
-GRIDFIELD_HDR = gridfields/abstractcellarray.h  gridfields/implicit0cells.h \
-gridfields/access.h             gridfields/implicitcrossnodemap.h \
-gridfields/apply.h              gridfields/nodemap.h \
-gridfields/array.h              gridfields/normnodemap.h \
-gridfields/binarynodemap.h      gridfields/object.h \
-gridfields/cellarray.h          gridfields/ordmap.h \
-gridfields/cell.h               gridfields/rankeddataset.h \
-gridfields/crossnodemap.h       gridfields/restrict.h \
-gridfields/dataset.h            gridfields/timing.h \
-gridfields/expr.h               gridfields/tuple.h \
-gridfields/gridfield.h          gridfields/type.h \
-gridfields/gridfieldoperator.h  gridfields/unarynodemap.h \
-gridfields/grid.h               gridfields/gfutil.h \
-gridfields/idordmap.h		gridfields/crossordmap.h \
-gridfields/fparser.hh		gridfields/fpconfig.hh \
-gridfields/fptypes.hh		gridfields/sift.h
-
 DAP_SRC = AttrTable.cc DAS.cc DDS.cc DataDDS.cc DDXParserSAX2.cc	\
 	BaseType.cc Byte.cc Int32.cc Float64.cc Str.cc Url.cc		\
 	Vector.cc Array.cc Structure.cc Sequence.cc Grid.cc UInt32.cc	\
@@ -249,7 +236,7 @@ DAP_SRC = AttrTable.cc DAS.cc DDS.cc DataDDS.cc DDXParserSAX2.cc	\
 	ConstraintEvaluator.cc ArrayGeoConstraint.cc DapIndent.cc	\
 	Operators.h XDRUtils.cc XDRFileMarshaller.cc			\
 	XDRFileUnMarshaller.cc XDRStreamMarshaller.cc			\
-	XDRStreamUnMarshaller.cc mime_util.cc Keywords2.cc
+	XDRStreamUnMarshaller.cc mime_util.cc Keywords2.cc XMLWriter.cc
 
 Operators.h: ce_expr.tab.hh
 
@@ -273,7 +260,7 @@ DAP_HDR = AttrTable.h DAS.h DDS.h DataDDS.h DDXParserSAX2.h		\
 	ce_parser.h DapIndent.h DapObj.h XDRFileMarshaller.h		\
 	Marshaller.h XDRFileUnMarshaller.h UnMarshaller.h		\
 	XDRStreamMarshaller.h XDRUtils.h xdr-datatypes.h mime_util.h	\
-	cgi_util.h XDRStreamUnMarshaller.h Keywords2.h
+	cgi_util.h XDRStreamUnMarshaller.h Keywords2.h XMLWriter.h 
 
 if USE_C99_TYPES
 dods-datatypes.h: dods-datatypes-static.h
@@ -289,7 +276,7 @@ CLIENT_HDR = RCReader.h Connect.h HTTPConnect.h HTTPCache.h		\
 	HTTPCacheDisconnectedMode.h HTTPCacheInterruptHandler.h		\
 	Response.h HTTPResponse.h HTTPCacheResponse.h PipeResponse.h	\
 	StdinResponse.h SignalHandlerRegisteredErr.h			\
-	ResponseTooBigErr.h Resource.h HTTPCacheTable.h
+	ResponseTooBigErr.h Resource.h HTTPCacheTable.h HTTPCacheMacros.h
 
 SERVER_HDR = DODSFilter.h AlarmHandler.h EventHandler.h Ancillary.h	\
 	ResponseBuilder.h

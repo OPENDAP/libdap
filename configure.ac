@@ -4,7 +4,7 @@ dnl Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.62)
 dnl Update version here and below at LIB_CURRENT, ..., if needed.
-AC_INIT(libdap, 3.11.1, opendap-tech@opendap.org)
+AC_INIT(libdap, 3.11.4, opendap-tech@opendap.org)
 AC_DEFINE(DAP_PROTOCOL_VERSION, ["3.4"], [Highest DAP version implemented?])
 AC_SUBST(DAP_PROTOCOL_VERSION)
 
@@ -33,8 +33,6 @@ AC_MSG_NOTICE(Package SubMinor Version:  $PACKAGE_SUBMINOR_VERSION)
 AC_SUBST(PACKAGE_MAJOR_VERSION)
 AC_SUBST(PACKAGE_MINOR_VERSION)
 AC_SUBST(PACKAGE_SUBMINOR_VERSION)
-
-
 
 AC_DEFINE(EVAL, 1, [Should all the classes run ConstraintEvaluator::eval()?])
 AC_SUBST(EVAL)
@@ -297,68 +295,7 @@ AC_SUBST([XML2_LIBS])
 AC_SUBST([XML2_STATIC_LIBS])
 AC_SUBST([XML2_CFLAGS])
 
-dnl DAP_CHECK_ZLIB
-
-dnl When pkgconfig support is added, use this
-libdap_libgridfields_module='libgridfields >= 0.7.0'
-
-libgf_ok="no"
-
-AC_WITH([gridfields],
-    [GF_LIBS="-L$withval/lib -lgridfields"
-     GF_CFLAGS="-I$withval/include"
-     AC_DEFINE([GRIDFIELDS],[1],[define if gridfields lib is present])
-     libgf_ok="yes"],
-    [])
-
-AC_ARG_ENABLE([gridfields],
-    AC_HELP_STRING([--enable-gridfields], [Enable libgridfields-based server functions (default is NO)]))
-
-if test "$libgf_ok" = "no" -a "$enable_gridfields" = "yes"
-then
-     
-AC_MSG_CHECKING([for libgridfields])
-if gridfields-config --version > /dev/null 2>&1
-then
-	version_libgf=`gridfields-config --version | sed 's@libgridfields \(.*\)@\1@'`
-
-	version_M=`echo $version_libgf | sed 's@^\([[0-9]]\)*\.\([[0-9]]*\)\.\([[0-9]]*\)$@\1@'`
-	version_m=`echo $version_libgf | sed 's@^\([[0-9]]\)*\.\([[0-9]]*\)\.\([[0-9]]*\)$@\2@'`
-	version_m_m=`echo $version_libgf | sed 's@^\([[0-9]]\)*\.\([[0-9]]*\)\.\([[0-9]]*\)$@\3@'`
-	
-	dnl Test for several different versions of libgridfields
-	
-	if test $version_M -gt 0
-	then
-		libgf_ok='yes'
-	elif test $version_M -eq 0 && test $version_m -gt 7
-	then
-		libgf_ok='yes'
-	elif test $version_M -eq 0 && test $version_m -eq 7 && test $version_m_m -gt 0
-	then
-		libgf_ok='yes'
-	else
-		libgf_ok='no'
-	fi
-
-	if test "$libgf_ok"="no"
-	then
-  	    AC_MSG_ERROR([must have libgf 0.7.0 or greater, found $version_libgf])
-	fi
-
-	GF_LIBS="`gridfields-config --libs`"
-	GF_CFLAGS="`gridfields-config --cflags`"
-
-	AC_DEFINE([GRDIFIELDS],[1],[define if gridfields lib is present])
-	AC_MSG_RESULT([yes; used gridfields-config])
-else
-	AC_MSG_ERROR([I could not find libgridfields])
-fi
-
-fi
-
-AC_SUBST([GF_LIBS])
-AC_SUBST([GF_CFLAGS])
+# DAP_CHECK_ZLIB
 
 AC_CHECK_LIB([pthread], [pthread_kill], 
 	[PTHREAD_LIBS="-lpthread"],
@@ -384,6 +321,16 @@ AC_DEFINE([LIBDAP_ROOT], ["/usr/local"], [Set to the prefix directory])
 else
 AC_DEFINE_UNQUOTED([LIBDAP_ROOT], ["$prefix"], [Set to the prefix directory])
 fi
+
+AC_ARG_ENABLE([checksums], 
+    AC_HELP_STRING([--enable-checksums], [Enable MD5 checksums (default is NO)]))
+
+dnl echo "enable_checksums = $enable_checksums"
+AS_IF([test "x$enable_checksums" = "xyes"], [
+    dnl Do the stuff needed for enabling the feature
+    dnl echo "Defining checksums! "
+    AC_DEFINE([CHECKSUMS], 1, [Should checksums be generated])
+])
 
 dnl autoheader macros; tack some text at the top and bottom of config_dap.h.in
 
