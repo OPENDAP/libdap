@@ -1347,7 +1347,7 @@ DDS::mark(const string &n, bool state)
         DBG2(cerr << "DDS::mark: Set variable " << s->top()->name()
                 << " (a " << s->top()->type_name() << ")" << endl);
         // FIXME get_parent() hosed?
-#if 1
+#if 0
         string parent_name = (s->top()->get_parent()) ? s->top()->get_parent()->name(): "none";
         string parent_type = (s->top()->get_parent()) ? s->top()->get_parent()->type_name(): "none";
         DBG2(cerr << "DDS::mark: Parent variable " << parent_name << " (a " << parent_type << ")" << endl);
