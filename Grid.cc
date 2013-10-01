@@ -19,7 +19,7 @@
 //
 // You should have received a copy of the GNU Lesser General Public
 // License along with this library; if not, write to the Free Software
-// Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+// Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 //
 // You can contact OPeNDAP, Inc. at PO Box 112, Saunderstown, RI. 02874-0112.
 
@@ -211,9 +211,9 @@ Grid::set_in_selection(bool state)
 
     BaseType::set_in_selection(state);
 }
-
+#if 0
 unsigned int
-Grid::width()
+Grid::width(bool)
 {
     unsigned int sz = d_array_var->width();
 
@@ -223,7 +223,7 @@ Grid::width()
 
     return sz;
 }
-
+#endif
 /** This version of width simply returns the same thing as width() for simple
     types and Arrays. For Structure it returns the total size if constrained
     is false, or the size of the elements in the current projection if true.

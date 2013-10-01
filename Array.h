@@ -19,7 +19,7 @@
 //
 // You should have received a copy of the GNU Lesser General Public
 // License along with this library; if not, write to the Free Software
-// Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+// Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 //
 // You can contact OPeNDAP, Inc. at PO Box 112, Saunderstown, RI. 02874-0112.
 
@@ -173,7 +173,7 @@ public:
     virtual void clear_constraint();
 
     virtual void update_length(int size);
-    virtual unsigned int width(bool constrained = true);
+    virtual unsigned int width(bool constrained = false);
 
     Dim_iter dim_begin() ;
     Dim_iter dim_end() ;

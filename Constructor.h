@@ -19,7 +19,7 @@
 //
 // You should have received a copy of the GNU Lesser General Public
 // License along with this library; if not, write to the Free Software
-// Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+// Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 //
 // You can contact OPeNDAP, Inc. at PO Box 112, Saunderstown, RI. 02874-0112.
 
@@ -68,9 +68,10 @@ public:
     virtual void set_read_p(bool state);
 
     /// @deprecated
-    virtual unsigned int width();
+    virtual unsigned int width(bool constrained = false);
+#if 0
     virtual unsigned int width(bool constrained);
-
+#endif
     /// btp_stack no longer needed; use back pointers (BaseType::get_parent())
     virtual BaseType *var(const string &name, bool exact_match = true, btp_stack *s = 0);
     /// @deprecated

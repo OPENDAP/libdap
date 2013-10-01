@@ -19,7 +19,7 @@
 //
 // You should have received a copy of the GNU Lesser General Public
 // License along with this library; if not, write to the Free Software
-// Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+// Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 //
 // You can contact OPeNDAP, Inc. at PO Box 112, Saunderstown, RI. 02874-0112.
 
@@ -1204,6 +1204,7 @@ BaseType::ops(BaseType *, int)
     throw InternalErr(__FILE__, __LINE__, "Unimplemented operator.");
 }
 
+// FIXME update this comment if the removal of width() works
 /** This version of width simply returns the same thing as width() for simple
     types and Arrays. For Constructors, it needs to be specialized. This is
     partly due to an inconsistency in the way Vector::width() is implemented.
@@ -1214,9 +1215,12 @@ BaseType::ops(BaseType *, int)
     @return  The number of bytes used by the variable.
  */
 unsigned int
-BaseType::width(bool /*constrained*/)
+BaseType::width(bool /* constrained */)
 {
-	return width();
+	throw InternalErr(__FILE__, __LINE__, "not implemented");
+#if 0
+	return width(constrained);
+#endif
 }
 
 } // namespace libdap
