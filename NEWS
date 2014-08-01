@@ -1,6 +1,6 @@
 News for version 3.13.2
 
-Merged a fix for leaks in the server function evaluation code.
+Fixed a memory leak in the CE parser when evaluating server functions.
 
 News for version 3.13.1
 
@@ -10,7 +10,7 @@ was changed.
 
 News for version 3.13.0
 
-Added a xml file to serve as input for the perl-based abi compatibility 
+Added a xml file to serve as input for the perl-based abi compatability 
 checker. Seems to be pretty slick; see abi-checker.xml.in for more info.
 
 Some updates - mostly addition of #include <unistd.h> - for OSX 10.9's
